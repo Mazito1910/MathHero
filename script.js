@@ -332,6 +332,8 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
   var screen = $(id);
   if (screen) screen.classList.add('active');
+  if (id === 'screen-menu') MatrixRain.start();
+  else MatrixRain.stop();
 }
 
 function flash(color) {
@@ -769,6 +771,65 @@ function goToMenu() {
   showScreen('screen-menu');
   SoundSystem.startMenuMusic();
 }
+
+// =====================================================================
+// MATRIX RAIN (nur Startbildschirm)
+// =====================================================================
+var MatrixRain = (function () {
+  var canvas = null, ctx = null, animId = null, drops = [];
+  var FS = 16, CW = 18;
+  var CHARS = '0123456789+-×÷=?';
+
+  function init() {
+    canvas = document.getElementById('matrix-canvas');
+    if (!canvas) return false;
+    ctx = canvas.getContext('2d');
+    return true;
+  }
+
+  function resize() {
+    var p = canvas.parentElement;
+    canvas.width  = p.offsetWidth  || 940;
+    canvas.height = p.offsetHeight || 660;
+    var cols = Math.floor(canvas.width / CW);
+    drops = [];
+    for (var i = 0; i < cols; i++) {
+      drops[i] = -Math.floor(Math.random() * (canvas.height / FS));
+    }
+  }
+
+  function draw() {
+    ctx.fillStyle = 'rgba(22,33,62,0.10)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.font = FS + 'px monospace';
+    for (var i = 0; i < drops.length; i++) {
+      var y = drops[i] * FS;
+      if (y >= 0) {
+        var c = CHARS[Math.floor(Math.random() * CHARS.length)];
+        ctx.fillStyle = '#ccffcc';
+        ctx.fillText(c, i * CW, y);
+      }
+      drops[i]++;
+      if (drops[i] * FS > canvas.height && Math.random() > 0.975) {
+        drops[i] = -Math.floor(Math.random() * 10);
+      }
+    }
+  }
+
+  return {
+    start: function () {
+      if (!canvas && !init()) return;
+      resize();
+      if (animId) clearInterval(animId);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      animId = setInterval(draw, 50);
+    },
+    stop: function () {
+      if (animId) { clearInterval(animId); animId = null; }
+      if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  };
+})();
 
 // =====================================================================
 // INIT
