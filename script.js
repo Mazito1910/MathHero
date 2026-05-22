@@ -26,279 +26,298 @@ const G = {
 // =====================================================================
 // SOUND SYSTEM
 // =====================================================================
+// =====================================================================
+// SOUND SYSTEM — Tone.js
+// =====================================================================
 const SoundSystem = {
-  audioCtx: null,
-  bgmTimeout: null,
-  currentTempo: 1,
-  isPlaying: false,
-  menuPlaying: false,
-  menuTimeout: null,
+  _ready: false,
+  _loops: [],
+  _baseBpm: 96,
   lastWarningTime: 0,
 
-  init() {
-    if (!this.audioCtx) {
-      this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (this.audioCtx.state === 'suspended') this.audioCtx.resume();
+  // ---- Initialisierung (einmalig nach erstem Klick) ----
+  async init() {
+    try {
+      await Tone.start();
+      if (this._ready) return;
+
+      const verb = new Tone.Reverb({ decay: 2.2, wet: 0.28 }).toDestination();
+
+      // Melodie-Synth (PolySynth für überlappende SFX-Noten)
+      this._mel = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle8' },
+        envelope: { attack: 0.02, decay: 0.12, sustain: 0.55, release: 0.4 }
+      }).connect(verb);
+      this._mel.volume.value = -8;
+
+      // Bass-Synth
+      this._bass = new Tone.Synth({
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.08, decay: 0.25, sustain: 0.5, release: 0.8 }
+      }).connect(verb);
+      this._bass.volume.value = -13;
+
+      // Pad-Akkorde
+      this._pad = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.5, decay: 0.3, sustain: 0.7, release: 2.0 }
+      }).connect(verb);
+      this._pad.volume.value = -22;
+
+      // Schlagzeug
+      this._kick = new Tone.MembraneSynth({
+        pitchDecay: 0.04, octaves: 6,
+        envelope: { attack: 0.001, decay: 0.3, sustain: 0.01, release: 0.1 }
+      }).toDestination();
+      this._kick.volume.value = -5;
+
+      this._snare = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.13, sustain: 0, release: 0.05 }
+      }).toDestination();
+      this._snare.volume.value = -14;
+
+      this._hihat = new Tone.MetalSynth({
+        frequency: 500,
+        envelope: { attack: 0.001, decay: 0.08, release: 0.01 },
+        harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5
+      }).toDestination();
+      this._hihat.volume.value = -24;
+
+      // SFX-Synths
+      this._sfxH = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.25 }
+      }).toDestination();
+      this._sfxH.volume.value = -5;
+
+      this._sfxL = new Tone.Synth({
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.005, decay: 0.14, sustain: 0.2, release: 0.25 }
+      }).toDestination();
+      this._sfxL.volume.value = -10;
+
+      this._sfxBlip = new Tone.Synth({
+        oscillator: { type: 'square' },
+        envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.04 }
+      }).toDestination();
+      this._sfxBlip.volume.value = -16;
+
+      this._ready = true;
+    } catch (e) { /* Autoplay-Policy — startet beim ersten Klick */ }
   },
 
-  // Play a single note with optional vibrato
-  playNote(freq, duration, type, volume, vibrato) {
-    freq = freq || 440; duration = duration || 0.1;
-    type = type || 'sine'; volume = volume || 0.12;
-    this.init();
-    var ctx = this.audioCtx;
-    var osc = ctx.createOscillator();
-    var gain = ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, ctx.currentTime);
-    if (vibrato) {
-      var lfo = ctx.createOscillator();
-      var lfoGain = ctx.createGain();
-      lfo.frequency.value = 5;
-      lfoGain.gain.value = vibrato;
-      lfo.connect(lfoGain);
-      lfoGain.connect(osc.frequency);
-      lfo.start(); lfo.stop(ctx.currentTime + duration);
-    }
-    gain.gain.setValueAtTime(volume, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.start(); osc.stop(ctx.currentTime + duration);
+  _stopLoops() {
+    Tone.Transport.stop();
+    Tone.Transport.cancel(0);
+    this._loops.forEach(function(l) { try { l.dispose(); } catch(e) {} });
+    this._loops = [];
   },
 
-  // Play a chord (multiple notes at once)
-  playChord(freqs, duration, type, volume) {
+  // ================================================================
+  // MENÜ-MUSIK — fröhlich, unaufgeregt (C-Dur, 96 BPM)
+  // ================================================================
+  async startMenuMusic() {
+    await this.init();
+    if (!this._ready) return;
+    this._stopLoops();
+    this._baseBpm = 96;
+    Tone.Transport.bpm.value = 96;
+
+    var mel  = ['C5','E5','G5','E5','F5','A5','G5','E5','D5','F5','E5','C5','G4','B4','C5',null];
+    var bass = ['C3',null,null,null,'F3',null,null,null,'C3',null,null,null,'G3',null,null,null];
+    var pad  = [['C3','E3','G3'],null,null,null,['F3','A3','C4'],null,null,null,
+                ['C3','E3','G3'],null,null,null,['G2','B2','D3'],null,null,null];
+
+    var m = this._mel, b = this._bass, p = this._pad;
+    var s1 = new Tone.Sequence(function(t,n){ if(n) m.triggerAttackRelease(n,'8n',t); }, mel, '8n');
+    var s2 = new Tone.Sequence(function(t,n){ if(n) b.triggerAttackRelease(n,'2n',t); }, bass,'8n');
+    var s3 = new Tone.Sequence(function(t,n){ if(n) p.triggerAttackRelease(n,'2n',t); }, pad, '8n');
     var self = this;
-    freqs.forEach(function(f) { self.playNote(f, duration, type, volume * 0.6); });
+    [s1,s2,s3].forEach(function(s){ s.start(0); self._loops.push(s); });
+    Tone.Transport.start();
   },
 
+  stopMenuMusic() { this._stopLoops(); },
+
+  // ================================================================
+  // LEVEL-MUSIK — 5 Tiers, jedes 2. Level spannender
+  // ================================================================
+  async startLevelMusic(level) {
+    await this.init();
+    if (!this._ready) return;
+    this._stopLoops();
+
+    var cfg = level <= 2 ? this._tier(1)
+            : level <= 4 ? this._tier(2)
+            : level <= 6 ? this._tier(3)
+            : level <= 8 ? this._tier(4)
+            :               this._tier(5);
+
+    this._baseBpm = cfg.bpm;
+    Tone.Transport.bpm.value = cfg.bpm;
+    var self = this;
+    cfg.loops.forEach(function(l){ l.start(0); self._loops.push(l); });
+    Tone.Transport.start();
+  },
+
+  _tier(n) {
+    var m = this._mel, b = this._bass, k = this._kick, s = this._snare, h = this._hihat;
+
+    function sq(cb, arr) { return new Tone.Sequence(cb, arr, '8n'); }
+
+    if (n === 1) {
+      // Sehr ruhig — sanftes Arpeggio C-Dur, keine Drums, 72 BPM
+      return { bpm: 72, loops: [
+        sq(function(t,n){ if(n) m.triggerAttackRelease(n,'16n',t); },
+          ['C4','E4','G4','C5','G4','E4','C4',null,
+           'F4','A4','C5','F4','C5','A4','F4',null])
+      ]};
+    }
+    if (n === 2) {
+      // Etwas Bewegung — G-Dur + Bass, 84 BPM
+      return { bpm: 84, loops: [
+        sq(function(t,n){ if(n) m.triggerAttackRelease(n,'16n',t); },
+          ['G4','B4','D5','G5','D5','B4','G4',null,
+           'C5','E5','G5','E5','C5','B4','A4',null]),
+        sq(function(t,n){ if(n) b.triggerAttackRelease(n,'4n',t); },
+          ['G2',null,null,null,'G2',null,null,null,
+           'C3',null,null,null,'G3',null,null,null])
+      ]};
+    }
+    if (n === 3) {
+      // Spannung steigt — a-Moll + Kick, 100 BPM
+      return { bpm: 100, loops: [
+        sq(function(t,n){ if(n) m.triggerAttackRelease(n,'16n',t); },
+          ['A4','C5','E5','A5','E5','C5','A4',null,
+           'G4','B4','D5','G5','D5','B4','G4',null]),
+        sq(function(t,n){ if(n) b.triggerAttackRelease(n,'4n',t); },
+          ['A2',null,null,null,'A2',null,null,null,
+           'E2',null,null,null,'E2',null,null,null]),
+        sq(function(t,n){ if(n) k.triggerAttackRelease(n,'8n',t); },
+          ['C1',null,'C1',null,'C1',null,'C1',null,
+           'C1',null,'C1',null,'C1',null,'C1',null])
+      ]};
+    }
+    if (n === 4) {
+      // Dringend — a-Moll + Chromatik + Snare, 116 BPM
+      return { bpm: 116, loops: [
+        sq(function(t,n){ if(n) m.triggerAttackRelease(n,'16n',t); },
+          ['A4','C5','E5','A5','G#5','E5','C5','B4',
+           'A4','G4','F4','G4','A4','C5','E5',null]),
+        sq(function(t,n){ if(n) b.triggerAttackRelease(n,'8n',t); },
+          ['A2',null,'A2',null,'E2',null,'E2',null,
+           'F2',null,'F2',null,'E2',null,'E2',null]),
+        sq(function(t,n){ if(n) k.triggerAttackRelease(n,'8n',t); },
+          ['C1',null,'C1',null,'C1',null,'C1',null,
+           'C1',null,'C1',null,'C1',null,'C1',null]),
+        sq(function(t,n){ if(n) s.triggerAttackRelease('16n',t); },
+          [null,null,null,null,'C1',null,null,null,
+           null,null,null,null,'C1',null,null,null])
+      ]};
+    }
+    // Tier 5 — maximale Spannung, volle Drums, 134 BPM
+    return { bpm: 134, loops: [
+      sq(function(t,n){ if(n) m.triggerAttackRelease(n,'16n',t); },
+        ['A5','G5','F5','E5','D5','C5','B4','A4',
+         'G#4','A4','B4','C5','D5','E5','F5','G5']),
+      sq(function(t,n){ if(n) b.triggerAttackRelease(n,'16n',t); },
+        ['A2','A2','E2','E2','F2','F2','E2','E2',
+         'A1','A1','E2','E2','F2','F2','E2','E2']),
+      sq(function(t,n){ if(n) k.triggerAttackRelease(n,'8n',t); },
+        ['C1',null,'C1',null,'C1',null,'C1',null,
+         'C1','C1','C1',null,'C1',null,'C1',null]),
+      sq(function(t,n){ if(n) s.triggerAttackRelease('32n',t); },
+        [null,null,null,null,'C1',null,null,null,
+         null,null,null,null,'C1',null,'C1',null]),
+      sq(function(t,n){ if(n) h.triggerAttackRelease('C6','32n',t); },
+        ['C1','C1','C1','C1','C1','C1','C1','C1',
+         'C1','C1','C1','C1','C1','C1','C1','C1'])
+    ]};
+  },
+
+  setTempo(mult) { Tone.Transport.bpm.value = this._baseBpm * mult; },
+  stopMusic()    { this._stopLoops(); },
+
+  // ================================================================
+  // SFX  (Sekunden-basierte Dauern — unabhängig vom Transport-BPM)
+  // ================================================================
   playCorrect() {
-    var self = this;
-    // Bright ascending arpeggio
-    self.playNote(523, 0.1, 'triangle', 0.15);
-    setTimeout(function() { self.playNote(659, 0.1, 'triangle', 0.15); }, 70);
-    setTimeout(function() { self.playNote(784, 0.1, 'triangle', 0.15); }, 140);
-    setTimeout(function() { self.playChord([784, 988], 0.18, 'triangle', 0.14); }, 210);
+    if (!this._ready) return;
+    var t = Tone.now();
+    this._sfxH.triggerAttackRelease('C5', 0.1, t);
+    this._sfxH.triggerAttackRelease('E5', 0.1, t + 0.08);
+    this._sfxH.triggerAttackRelease('G5', 0.15, t + 0.16);
   },
-
   playWrong() {
-    var self = this;
-    self.playNote(220, 0.12, 'sawtooth', 0.15);
-    setTimeout(function() { self.playNote(196, 0.18, 'sawtooth', 0.15); }, 90);
+    if (!this._ready) return;
+    var t = Tone.now();
+    this._sfxL.triggerAttackRelease('A3', 0.12, t);
+    this._sfxL.triggerAttackRelease('F3', 0.18, t + 0.15);
   },
-
   playTimeWarning() {
-    this.playNote(880, 0.07, 'square', 0.09);
+    if (this._ready) this._sfxBlip.triggerAttackRelease('A5', 0.05, Tone.now());
   },
-
   playAttack() {
-    var self = this;
-    // Swoosh + impact
-    self.playNote(400, 0.05, 'sawtooth', 0.12);
-    setTimeout(function() { self.playNote(200, 0.15, 'square', 0.15); }, 60);
+    if (!this._ready) return;
+    var t = Tone.now();
+    this._sfxBlip.triggerAttackRelease('G4', 0.04, t);
+    this._sfxBlip.triggerAttackRelease('C4', 0.08, t + 0.07);
   },
-
   playSuperAttack() {
-    var self = this;
-    // Dramatic power-up + explosion
-    var notes = [330, 392, 494, 587, 659, 784, 880];
-    notes.forEach(function(n, i) {
-      setTimeout(function() { self.playNote(n, 0.1, 'square', 0.14); }, i * 55);
-    });
-    setTimeout(function() {
-      self.playChord([262, 330, 392], 0.5, 'sawtooth', 0.15);
-    }, notes.length * 55 + 50);
+    if (!this._ready) return;
+    var t = Tone.now();
+    ['C4','E4','G4','C5','E5','G5','C6'].forEach(function(n, i) {
+      this._sfxH.triggerAttackRelease(n, 0.1, t + i * 0.07);
+    }.bind(this));
   },
-
   playLevelComplete() {
-    var self = this;
-    // Triumphant fanfare melody: G major ascending + resolution
-    var melody = [
-      {f:392,d:0.1},{f:392,d:0.1},{f:392,d:0.1},
-      {f:523,d:0.3},{f:494,d:0.15},{f:440,d:0.15},
-      {f:392,d:0.35},{f:523,d:0.12},{f:659,d:0.4}
-    ];
-    var t = 0;
-    melody.forEach(function(n) {
-      (function(note, time) {
-        setTimeout(function() { self.playNote(note.f, note.d + 0.05, 'triangle', 0.15); }, time);
-      })(n, t);
-      t += n.d * 900;
-    });
+    if (!this._ready) return;
+    var t = Tone.now();
+    [['G4',0],['G4',.12],['G4',.24],['C5',.38],['B4',.55],['A4',.70],
+     ['G4',.86],['C5',1.0],['E5',1.16]].forEach(function(nd) {
+      this._sfxH.triggerAttackRelease(nd[0], 0.15, t + nd[1]);
+    }.bind(this));
   },
-
   playGameOver() {
-    var self = this;
-    var melody = [
-      {f:392,d:0.25},{f:349,d:0.25},{f:330,d:0.25},
-      {f:294,d:0.35},{f:262,d:0.5}
-    ];
-    var t = 0;
-    melody.forEach(function(n) {
-      (function(note, time) {
-        setTimeout(function() { self.playNote(note.f, note.d, 'sawtooth', 0.14); }, time);
-      })(n, t);
-      t += n.d * 1000;
-    });
+    if (!this._ready) return;
+    var t = Tone.now();
+    [['G4',0],['F4',.30],['E4',.60],['D4',.90],['C4',1.20]].forEach(function(nd) {
+      this._sfxL.triggerAttackRelease(nd[0], 0.25, t + nd[1]);
+    }.bind(this));
   },
-
   playVictory() {
-    var self = this;
-    // Full victory fanfare
-    var melody = [
-      {f:523,d:0.12},{f:523,d:0.12},{f:523,d:0.12},{f:523,d:0.35},
-      {f:415,d:0.35},{f:466,d:0.35},
-      {f:523,d:0.18},{f:466,d:0.1},{f:523,d:0.12},
-      {f:659,d:0.5},{f:784,d:0.6}
-    ];
-    var t = 0;
-    melody.forEach(function(n) {
-      (function(note, time) {
-        setTimeout(function() { self.playNote(note.f, note.d + 0.05, 'triangle', 0.15, 3); }, time);
-      })(n, t);
-      t += n.d * 850;
-    });
+    if (!this._ready) return;
+    var t = Tone.now();
+    [['C5',0],['C5',.13],['C5',.26],['C5',.40],['Ab4',.55],['Bb4',.68],
+     ['C5',.81],['Bb4',.91],['C5',1.01],['Eb5',1.15],['G5',1.40]].forEach(function(nd) {
+      this._sfxH.triggerAttackRelease(nd[0], 0.15, t + nd[1]);
+    }.bind(this));
   },
-
-  playClick() { this.playNote(600, 0.05, 'square', 0.08); },
-
+  playClick()  { if (this._ready) this._sfxBlip.triggerAttackRelease('G5', 0.05, Tone.now()); },
   playSelect() {
-    var self = this;
-    self.playNote(440, 0.07, 'triangle', 0.12);
-    setTimeout(function() { self.playNote(550, 0.1, 'triangle', 0.14); }, 55);
-    setTimeout(function() { self.playNote(660, 0.12, 'triangle', 0.14); }, 110);
+    if (!this._ready) return;
+    var t = Tone.now();
+    this._sfxH.triggerAttackRelease('A4', 0.07, t);
+    this._sfxH.triggerAttackRelease('C5', 0.07, t + 0.07);
+    this._sfxH.triggerAttackRelease('E5', 0.10, t + 0.14);
   },
-
   playLifeLost() {
-    var self = this;
-    self.playNote(349, 0.18, 'sawtooth', 0.15);
-    setTimeout(function() { self.playNote(262, 0.28, 'sawtooth', 0.15); }, 140);
-  },
-
-  // ---- MENU MUSIC: gentle waltz-like melody in C major ----
-  startMenuMusic() {
-    var self = this;
-    self.stopMenuMusic();
-    self.init();
-    self.menuPlaying = true;
-
-    // Melody notes + durations (ms): friendly, bouncy tune
-    var melody = [
-      {f:523,d:280},{f:587,d:200},{f:659,d:200},
-      {f:698,d:380},{f:659,d:200},{f:587,d:200},
-      {f:523,d:380},{f:494,d:200},{f:440,d:200},
-      {f:392,d:380},{f:440,d:200},{f:494,d:200},
-      {f:523,d:380},{f:523,d:200},{f:587,d:200},
-      {f:659,d:380},{f:784,d:200},{f:740,d:200},
-      {f:698,d:380},{f:659,d:200},{f:587,d:200},
-      {f:523,d:600}
-    ];
-
-    // Bass notes (harmony)
-    var bass = [
-      {f:262,d:280},{f:0,d:200},{f:0,d:200},
-      {f:349,d:380},{f:0,d:200},{f:0,d:200},
-      {f:262,d:380},{f:0,d:200},{f:0,d:200},
-      {f:196,d:380},{f:0,d:200},{f:0,d:200},
-      {f:262,d:380},{f:0,d:200},{f:0,d:200},
-      {f:330,d:380},{f:0,d:200},{f:0,d:200},
-      {f:349,d:380},{f:0,d:200},{f:0,d:200},
-      {f:262,d:600}
-    ];
-
-    var idx = 0;
-    function playNextMenuNote() {
-      if (!self.menuPlaying) return;
-      var note = melody[idx];
-      var b = bass[idx];
-      if (note.f > 0) self.playNote(note.f, note.d / 1000 * 0.85, 'triangle', 0.1, 2);
-      if (b && b.f > 0) self.playNote(b.f, b.d / 1000 * 0.75, 'sine', 0.07);
-      var wait = note.d;
-      idx = (idx + 1) % melody.length;
-      self.menuTimeout = setTimeout(playNextMenuNote, wait);
-    }
-    playNextMenuNote();
-  },
-
-  stopMenuMusic() {
-    this.menuPlaying = false;
-    if (this.menuTimeout) { clearTimeout(this.menuTimeout); this.menuTimeout = null; }
-  },
-
-  // ---- LEVEL MUSIC: proper melodies per level tier ----
-  getLevelMelody(level) {
-    // Each melody: array of {f, d} — frequency (Hz), duration (ms)
-    if (level <= 2) return [
-      {f:262,d:300},{f:294,d:300},{f:330,d:300},{f:349,d:300},
-      {f:330,d:300},{f:294,d:300},{f:262,d:400},
-      {f:330,d:300},{f:349,d:300},{f:392,d:300},{f:349,d:300},
-      {f:330,d:300},{f:294,d:300},{f:262,d:500}
-    ];
-    if (level <= 4) return [
-      {f:330,d:250},{f:392,d:250},{f:440,d:250},{f:494,d:250},
-      {f:440,d:250},{f:392,d:250},{f:330,d:350},
-      {f:440,d:250},{f:494,d:250},{f:523,d:250},{f:494,d:250},
-      {f:440,d:250},{f:392,d:250},{f:330,d:450}
-    ];
-    if (level <= 6) return [
-      {f:392,d:200},{f:440,d:200},{f:494,d:200},{f:523,d:200},
-      {f:587,d:200},{f:523,d:200},{f:494,d:200},{f:440,d:200},
-      {f:392,d:300},{f:440,d:200},{f:523,d:200},{f:494,d:200},
-      {f:440,d:200},{f:392,d:200},{f:349,d:200},{f:392,d:350}
-    ];
-    if (level <= 8) return [
-      {f:494,d:160},{f:523,d:160},{f:587,d:160},{f:659,d:160},
-      {f:587,d:160},{f:523,d:160},{f:494,d:160},{f:440,d:160},
-      {f:523,d:220},{f:587,d:160},{f:659,d:160},{f:698,d:160},
-      {f:659,d:160},{f:587,d:160},{f:523,d:160},{f:494,d:280}
-    ];
-    return [
-      {f:587,d:130},{f:659,d:130},{f:698,d:130},{f:784,d:130},
-      {f:698,d:130},{f:659,d:130},{f:587,d:130},{f:523,d:130},
-      {f:659,d:170},{f:698,d:130},{f:784,d:130},{f:880,d:130},
-      {f:784,d:130},{f:698,d:130},{f:659,d:130},{f:587,d:200}
-    ];
-  },
-
-  startLevelMusic(level) {
-    var self = this;
-    self.stopMusic();
-    self.init();
-    self.isPlaying = true;
-    self.currentTempo = 1;
-
-    var melody = self.getLevelMelody(level);
-    var idx = 0;
-
-    var waveType = 'sine';
-    if (level > 3 && level <= 6) waveType = 'triangle';
-    else if (level > 6 && level <= 8) waveType = 'square';
-    else if (level > 8) waveType = 'sawtooth';
-
-    var volume = 0.07 + (level * 0.007);
-
-    function playNext() {
-      if (!self.isPlaying) return;
-      var note = melody[idx];
-      var dur = (note.d / 1000) / self.currentTempo;
-      self.playNote(note.f, dur * 0.88, waveType, volume, level > 6 ? 4 : 0);
-      idx = (idx + 1) % melody.length;
-      self.bgmTimeout = setTimeout(playNext, note.d / self.currentTempo);
-    }
-    playNext();
-  },
-
-  setTempo(multiplier) { this.currentTempo = multiplier; },
-
-  stopMusic() {
-    this.isPlaying = false;
-    if (this.bgmTimeout) { clearTimeout(this.bgmTimeout); this.bgmTimeout = null; }
-    this.currentTempo = 1;
+    if (!this._ready) return;
+    var t = Tone.now();
+    this._sfxL.triggerAttackRelease('F4', 0.15, t);
+    this._sfxL.triggerAttackRelease('C4', 0.30, t + 0.18);
   }
 };
 
-document.addEventListener('click', function() { SoundSystem.init(); }, { once: true });
+document.addEventListener('click', async function() {
+  await SoundSystem.init();
+  // Menü-Musik starten falls noch nicht laufend
+  var menu = document.getElementById('screen-menu');
+  if (menu && menu.classList.contains('active') && Tone.Transport.state !== 'started') {
+    SoundSystem.startMenuMusic();
+  }
+}, { once: true });
 
 // =====================================================================
 // CHARACTERS & ENEMIES
