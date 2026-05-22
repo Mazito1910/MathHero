@@ -752,18 +752,32 @@ function spawnProjectiles(isSuper) {
 // TASK GENERATION
 // =====================================================================
 function genOne(level) {
-  var ops, max;
-  if (level <= 2)      { ops = ['+', '-']; max = 8 + level; }
-  else if (level <= 4) { ops = ['+', '-']; max = 15; }
-  else if (level <= 6) { ops = ['+', '-', '×']; max = 12; }
-  else                 { ops = ['+', '-', '×', '÷']; max = 12; }
+  // Operations per level:
+  //  1-3  → nur + und −  (kleine Zahlen wachsen)
+  //  4-5  → + − und selten × (kleine Einmaleins-Einführung)
+  //  6-10 → + − × gleichwertig  (Einmaleins wächst mit Level)
+  var ops;
+  if      (level <= 3) ops = ['+', '-'];
+  else if (level <= 5) ops = ['+', '+', '-', '-', '×'];   // × seltener am Anfang
+  else                 ops = ['+', '-', '×'];
 
-  var op = ops[rnd(0, ops.length - 1)];
+  var op  = ops[rnd(0, ops.length - 1)];
   var a, b, ans;
-  if (op === '+') { a = rnd(1, max); b = rnd(1, Math.min(15, max)); ans = a + b; }
-  else if (op === '-') { a = rnd(2, max); b = rnd(1, a - 1); ans = a - b; }
-  else if (op === '×') { a = rnd(1, Math.min(10, Math.ceil(max/2)+1)); b = rnd(1, Math.min(10, Math.ceil(max/2)+1)); ans = a * b; }
-  else { b = rnd(1, 10); ans = rnd(1, 10); a = b * ans; }
+
+  if (op === '+') {
+    var mx = 5 + level * 2;                     // Lvl1→7, Lvl5→15, Lvl10→25
+    a = rnd(1, mx); b = rnd(1, mx); ans = a + b;
+
+  } else if (op === '-') {
+    var mx = 7 + level * 2;                     // Lvl1→9, Lvl5→17, Lvl10→27
+    a = rnd(4, mx); b = rnd(1, a - 1); ans = a - b;
+
+  } else {
+    // Einmaleins-Tabelle wächst mit Level: Lvl4→2-3, Lvl6→2-5, Lvl10→2-10
+    var tbl = Math.min(3 + Math.floor((level - 4) * 1.2), 10);
+    a = rnd(2, tbl); b = rnd(2, tbl); ans = a * b;
+  }
+
   return { text: a + ' ' + op + ' ' + b + ' = ?', answer: ans };
 }
 
@@ -805,7 +819,7 @@ function updateTimeBar(percent) {
 // =====================================================================
 function startTimer() {
   clearInterval(G.timer);
-  G.totalTime = Math.max(8, 18 - G.level);
+  G.totalTime = Math.max(13, 23 - G.level);
   G.timeLeft = G.totalTime;
   SoundSystem.lastWarningTime = 0;
   SoundSystem.startLevelMusic(G.level);
