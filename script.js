@@ -21,7 +21,8 @@ const G = {
   playerName: '',
   trainingMode: false,
   enemyHP: 5,          // visual HP for enemy
-  enemyMaxHP: 5
+  enemyMaxHP: 5,
+  _musicLevel: 0       // tracks which level's music is loaded; 0 = none
 };
 
 // =====================================================================
@@ -876,7 +877,11 @@ function updateTimeBar(percent) {
 // =====================================================================
 function startTimer() {
   clearInterval(G.timer);
-  SoundSystem.startLevelMusic(G.level);
+  // Start music only when the level changes — keeps melody running continuously
+  if (G.level !== G._musicLevel) {
+    G._musicLevel = G.level;
+    SoundSystem.startLevelMusic(G.level);
+  }
   if (G.trainingMode) {
     var fill = $('time-fill'), txt = $('time-text');
     if (fill) { fill.style.width = '100%'; fill.style.background = '#4CAF50'; }
@@ -1179,6 +1184,7 @@ function startGame() {
   SoundSystem.playClick();
 
   G.level = 1; G.score = 0; G.lives = 3; G.taskIdx = 0;
+  G._musicLevel = 0;
   G.totalElapsed = 0; G.gameStartTime = Date.now();
 
   generateTasks(); updateHUD(); updateSprites();
@@ -1197,6 +1203,7 @@ function goToMenu() {
   SoundSystem.playClick();
   G.selectedHero = null; G.playerName = '';
   G.trainingMode = false;
+  G._musicLevel = 0;
   tryEnableStart();
   showScreen('screen-menu');
   SoundSystem.startMenuMusic();
@@ -1325,10 +1332,14 @@ function initGame() {
   // --- Timeout ---
   $('btn-retry-timeout').addEventListener('click', retryFromTimeout);
 
+  // --- In-game exit to menu ---
+  $('btn-hud-exit').addEventListener('click', goToMenu);
+
   // --- Game over ---
   $('btn-retry-gameover').addEventListener('click', function() {
     SoundSystem.playClick();
     G.level = 1; G.score = 0; G.lives = 3; G.taskIdx = 0;
+    G._musicLevel = 0;
     G.totalElapsed = 0; G.gameStartTime = Date.now();
     generateTasks(); updateHUD(); updateSprites();
     showScreen('screen-game'); showTask();

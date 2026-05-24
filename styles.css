@@ -206,6 +206,22 @@ body::before {
 .hearts { display: flex; gap: 4px; }
 .heart { font-size: 1.3rem; transition: all .3s; }
 .heart.lost { filter: grayscale(1); opacity: .3; }
+.btn-hud-exit {
+  background: rgba(255,255,255,.08);
+  border: 1.5px solid rgba(255,255,255,.2);
+  color: rgba(255,255,255,.6);
+  border-radius: 9px;
+  font-size: .85rem; font-weight: 900;
+  padding: 3px 12px; cursor: pointer;
+  font-family: var(--font-body);
+  transition: background .15s, color .15s, border-color .15s;
+  letter-spacing: .5px;
+}
+.btn-hud-exit:hover {
+  background: rgba(231,76,60,.55);
+  border-color: #e74c3c;
+  color: #fff;
+}
 
 /* ARENA */
 .battle-arena {
