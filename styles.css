@@ -623,3 +623,31 @@ body::before {
 }
 .score-table tr:last-child td { border-bottom: none; }
 .score-table td:nth-child(4) { color: var(--primary); font-family: var(--font-title); }
+
+/* Highlighted row — newly achieved score after game over */
+.hs-highlight td {
+  background: rgba(255, 215, 0, 0.14) !important;
+  border-top:    2px solid #FFD700 !important;
+  border-bottom: 2px solid #FFD700 !important;
+}
+.hs-highlight td:first-child {
+  border-left:   3px solid #FFD700 !important;
+  border-radius: 6px 0 0 6px;
+}
+.hs-highlight td:last-child {
+  border-right:  3px solid #FFD700 !important;
+  border-radius: 0 6px 6px 0;
+}
+
+/* Game-over banner above the table */
+.hs-gameover-banner {
+  text-align: center;
+  font-size: .95rem; font-weight: 800;
+  color: rgba(255,255,255,.8);
+  background: rgba(231,76,60,.18);
+  border: 1.5px solid rgba(231,76,60,.45);
+  border-radius: 12px;
+  padding: .45rem 1.2rem;
+  margin-bottom: .6rem;
+  letter-spacing: .5px;
+}

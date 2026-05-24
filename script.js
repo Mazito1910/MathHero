@@ -72,39 +72,39 @@ const SoundSystem = {
         pitchDecay: 0.04, octaves: 6,
         envelope: { attack: 0.001, decay: 0.3, sustain: 0.01, release: 0.1 }
       }).toDestination();
-      this._kick.volume.value = -5;
+      this._kick.volume.value = -10;
 
       this._snare = new Tone.NoiseSynth({
         noise: { type: 'white' },
         envelope: { attack: 0.001, decay: 0.13, sustain: 0, release: 0.05 }
       }).toDestination();
-      this._snare.volume.value = -14;
+      this._snare.volume.value = -18;
 
       this._hihat = new Tone.MetalSynth({
         frequency: 500,
         envelope: { attack: 0.001, decay: 0.08, release: 0.01 },
         harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5
       }).toDestination();
-      this._hihat.volume.value = -24;
+      this._hihat.volume.value = -27;
 
-      // SFX-Synths
+      // SFX-Synths — leiser als vorher, damit Melodie nicht übertönt wird
       this._sfxH = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'triangle' },
         envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.25 }
       }).toDestination();
-      this._sfxH.volume.value = -5;
+      this._sfxH.volume.value = -13;
 
       this._sfxL = new Tone.Synth({
         oscillator: { type: 'sawtooth' },
         envelope: { attack: 0.005, decay: 0.14, sustain: 0.2, release: 0.25 }
       }).toDestination();
-      this._sfxL.volume.value = -10;
+      this._sfxL.volume.value = -17;
 
       this._sfxBlip = new Tone.Synth({
         oscillator: { type: 'square' },
         envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.04 }
       }).toDestination();
-      this._sfxBlip.volume.value = -16;
+      this._sfxBlip.volume.value = -22;
 
       this._ready = true;
     } catch (e) { /* Autoplay-Policy — startet beim ersten Klick */ }
@@ -1085,12 +1085,9 @@ function nextLevel() {
 function gameOver() {
   stopTimer();
   SoundSystem.playGameOver();
-  var gs = $('gameover-score'), gl = $('gameover-level');
-  if (gs) gs.textContent = G.score;
-  if (gl) gl.textContent = G.level;
-  // auto-save with known player name
-  autoSaveScore();
-  showScreen('screen-gameover');
+  if (!G.trainingMode) autoSaveScore();
+  showHighscores({ highlightScore: G.score, highlightName: G.playerName,
+                   gameOverLevel: G.level, isGameOver: true });
 }
 
 function victory() {
@@ -1137,23 +1134,47 @@ function loadScores() {
   catch (e) { return []; }
 }
 
-function showHighscores() {
-  var list = $('highscore-list');
+function showHighscores(opts) {
+  opts = opts || {};
+  var list   = $('highscore-list');
+  var banner = $('hs-gameover-banner');
+  var retry  = $('btn-hs-retry');
+  var title  = document.querySelector('#screen-highscore h2');
   if (!list) return;
-  var scores = loadScores();
 
+  // Banner & title
+  if (opts.isGameOver) {
+    if (title)  title.innerHTML = '💀 GAME OVER &nbsp;·&nbsp; 🏆 HIGHSCORE';
+    if (banner) {
+      banner.innerHTML = 'Level&nbsp;<strong>' + opts.gameOverLevel + '</strong>&nbsp;erreicht &nbsp;·&nbsp; ⭐&nbsp;<strong>' + opts.highlightScore + '</strong>&nbsp;Punkte';
+      banner.style.display = 'block';
+    }
+    if (retry) retry.style.display = 'inline-flex';
+  } else {
+    if (title)  title.innerHTML = '🏆 HIGHSCORE LISTE';
+    if (banner) banner.style.display = 'none';
+    if (retry)  retry.style.display = 'none';
+  }
+
+  var scores = loadScores();
   if (scores.length === 0) {
     list.innerHTML = '<p class="hs-empty">Noch keine Highscores!</p>';
   } else {
     var medals = ['🥇', '🥈', '🥉'];
+    var highlighted = false;
     var html = '<table class="score-table"><tr><th>#</th><th>Held</th><th>Name</th><th>Score</th><th>Level</th><th>Datum</th></tr>';
     scores.forEach(function(s, i) {
       var heroSVG = '<div style="width:36px;height:36px;display:inline-block;">' + getCharSVG(s.hero || 0) + '</div>';
-      html += '<tr>';
+      // Highlight the first row that matches the just-earned score + name
+      var isNew = !highlighted && opts.highlightScore !== undefined
+                  && s.score === opts.highlightScore
+                  && s.name  === opts.highlightName;
+      if (isNew) highlighted = true;
+      html += '<tr' + (isNew ? ' class="hs-highlight"' : '') + '>';
       html += '<td>' + (medals[i] || (i + 1)) + '</td>';
       html += '<td>' + heroSVG + '</td>';
       html += '<td>' + s.name + '</td>';
-      html += '<td style="color:var(--primary);font-family:var(--font-title)">' + s.score + '</td>';
+      html += '<td>' + s.score + '</td>';
       html += '<td>' + s.level + '</td>';
       html += '<td>' + s.date + '</td>';
       html += '</tr>';
@@ -1376,6 +1397,16 @@ function initGame() {
 
   // --- Victory ---
   $('btn-menu-victory').addEventListener('click', goToMenu);
+
+  // --- Highscore retry (shown after game over) ---
+  $('btn-hs-retry').addEventListener('click', function() {
+    SoundSystem.playClick();
+    G.level = 1; G.score = 0; G.lives = 3; G.taskIdx = 0;
+    G._musicLevel = 0;
+    G.totalElapsed = 0; G.gameStartTime = Date.now();
+    generateTasks(); updateHUD(); updateSprites();
+    showScreen('screen-game'); showTask();
+  });
 
   // --- Highscore ---
   $('btn-back-highscore').addEventListener('click', goToMenu);
