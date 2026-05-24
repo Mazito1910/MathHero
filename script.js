@@ -46,10 +46,10 @@ const SoundSystem = {
       this._verb = new Tone.Reverb({ decay: 2.0, wet: 0.18 }).toDestination();
       var verb = this._verb;  // local alias so .connect(verb) calls below stay unchanged
 
-      // Melodie-Synth — Basis: sine; wird per Tier auf sawtooth/square umgeschaltet
+      // Melodie-Synth — Triangle: warmer Synthesizer-Sound, kein Orgel-Klang
       this._mel = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: 'sine' },
-        envelope: { attack: 0.05, decay: 0.18, sustain: 0.4, release: 0.5 }
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.08, decay: 0.25, sustain: 0.45, release: 0.7 }
       }).connect(verb);
       this._mel.volume.value = -12;
 
@@ -124,6 +124,17 @@ const SoundSystem = {
     await this.init();
     if (!this._ready) return;
     this._stopLoops();
+
+    // Immer auf weichen Menü-Preset zurücksetzen — sonst klingt es nach hartem Game-Tier
+    try {
+      this._mel.set({ oscillator: { type: 'triangle' },
+                      envelope: { attack: 0.10, decay: 0.28, sustain: 0.50, release: 1.0 } });
+      this._mel.volume.value = -15;
+      if (this._bass) this._bass.set({ oscillator: { type: 'sine' } });
+      this._bass.volume.value = -16;
+      if (this._verb) this._verb.wet.value = 0.28;
+    } catch(e) {}
+
     this._baseBpm = 68;
     Tone.Transport.bpm.value = 68;
 
@@ -168,26 +179,29 @@ const SoundSystem = {
     Tone.Transport.start();
   },
 
-  // Schaltet Klangcharakter je Tier um: von weich/ambient zu scharf/8-bit/elektronisch
+  // Klangcharakter je Tier: Alle Tiers nutzen Triangle (warmer Synth ohne Härte).
+  // Steigerung entsteht durch kürzere Hüllkurve (mehr Punch) + Drums + BPM — nicht durch
+  // härtere Wellenformen, die perceptuell viel lauter klingen.
   _setSynthTier(n) {
-    // Oszillator-Typen: sine=weich → triangle → sawtooth=scharf → square=8-bit → fatsawtooth=fett
-    var osc  = [null, 'sine',      'triangle', 'sawtooth', 'square',  'sawtooth'];
-    var bOsc = [null, 'sine',      'sine',     'triangle', 'sawtooth','sawtooth'];
+    // Triangle durchgehend → gleich wahrgenommene Lautstärke, kein Lautstärkesprung
     var env  = [null,
-      { attack: 0.08, decay: 0.25, sustain: 0.5,  release: 0.8  }, // T1: sanft, lang
-      { attack: 0.04, decay: 0.18, sustain: 0.45, release: 0.45 }, // T2: warm, flüssig
-      { attack: 0.02, decay: 0.14, sustain: 0.35, release: 0.25 }, // T3: synthy, punch
-      { attack: 0.008,decay: 0.10, sustain: 0.28, release: 0.12 }, // T4: 8-bit, trocken
-      { attack: 0.005,decay: 0.08, sustain: 0.25, release: 0.08 }  // T5: aggressiv, knackig
+      { attack: 0.10, decay: 0.30, sustain: 0.50, release: 0.90 }, // T1: weich, schwebend
+      { attack: 0.06, decay: 0.22, sustain: 0.45, release: 0.60 }, // T2: flüssig, warm
+      { attack: 0.03, decay: 0.16, sustain: 0.40, release: 0.38 }, // T3: etwas Punch
+      { attack: 0.015,decay: 0.12, sustain: 0.35, release: 0.20 }, // T4: punchy, präsent
+      { attack: 0.008,decay: 0.09, sustain: 0.30, release: 0.12 }  // T5: snappy, dringend
     ];
-    var wet  = [null, 0.28, 0.20, 0.14, 0.09, 0.07];
-    var vol  = [null, -14,  -12,  -11,  -10,  -9  ];
+    // Reverb nimmt ab → Sound wird trockener/direkter (Gaming-Gefühl), nicht lauter
+    var wet = [null, 0.26, 0.21, 0.17, 0.13, 0.10];
 
     try {
-      if (this._mel)  { this._mel.set({ oscillator: { type: osc[n] }, envelope: env[n] });
-                        this._mel.volume.value  = vol[n]; }
-      if (this._bass) { this._bass.set({ oscillator: { type: bOsc[n] } }); }
-      if (this._verb) { this._verb.wet.value = wet[n]; }
+      if (this._mel) {
+        this._mel.set({ oscillator: { type: 'triangle' }, envelope: env[n] });
+        this._mel.volume.value = -12;   // konstant über alle Tiers
+      }
+      if (this._bass) this._bass.set({ oscillator: { type: 'triangle' } });
+      this._bass.volume.value = -14;
+      if (this._verb) this._verb.wet.value = wet[n];
     } catch(e) {}
   },
 
