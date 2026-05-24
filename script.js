@@ -19,6 +19,7 @@ const G = {
   gameStartTime: null,
   selectedHero: null,
   playerName: '',
+  trainingMode: false,
   enemyHP: 5,          // visual HP for enemy
   enemyMaxHP: 5
 };
@@ -41,14 +42,14 @@ const SoundSystem = {
       await Tone.start();
       if (this._ready) return;
 
-      const verb = new Tone.Reverb({ decay: 2.2, wet: 0.28 }).toDestination();
+      const verb = new Tone.Reverb({ decay: 3.2, wet: 0.38 }).toDestination();
 
       // Melodie-Synth (PolySynth für überlappende SFX-Noten)
       this._mel = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: 'triangle8' },
-        envelope: { attack: 0.02, decay: 0.12, sustain: 0.55, release: 0.4 }
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.05, decay: 0.2, sustain: 0.5, release: 1.0 }
       }).connect(verb);
-      this._mel.volume.value = -8;
+      this._mel.volume.value = -11;
 
       // Bass-Synth
       this._bass = new Tone.Synth({
@@ -121,13 +122,14 @@ const SoundSystem = {
     await this.init();
     if (!this._ready) return;
     this._stopLoops();
-    this._baseBpm = 96;
-    Tone.Transport.bpm.value = 96;
+    this._baseBpm = 68;
+    Tone.Transport.bpm.value = 68;
 
-    var mel  = ['C5','E5','G5','E5','F5','A5','G5','E5','D5','F5','E5','C5','G4','B4','C5',null];
-    var bass = ['C3',null,null,null,'F3',null,null,null,'C3',null,null,null,'G3',null,null,null];
-    var pad  = [['C3','E3','G3'],null,null,null,['F3','A3','C4'],null,null,null,
-                ['C3','E3','G3'],null,null,null,['G2','B2','D3'],null,null,null];
+    // Ruhige, tiefe C-Dur-Melodie – fällt sanft ab und wiederholt sich variiert
+    var mel  = ['G3',null,'E3','G3','C4','B3','A3',null,'G3','F3','E3',null,'D3',null,'C3',null];
+    var bass = ['C2',null,null,null,'F2',null,null,null,'C2',null,null,null,'G2',null,null,null];
+    var pad  = [['C3','G3'],null,null,null,['F3','A3'],null,null,null,
+                ['C3','E3'],null,null,null,['G2','D3'],null,null,null];
 
     var m = this._mel, b = this._bass, p = this._pad;
     var s1 = new Tone.Sequence(function(t,n){ if(n) m.triggerAttackRelease(n,'8n',t); }, mel, '8n');
@@ -167,30 +169,30 @@ const SoundSystem = {
     function sq(cb, arr) { return new Tone.Sequence(cb, arr, '8n'); }
 
     if (n === 1) {
-      // Sehr ruhig — sanftes Arpeggio C-Dur, keine Drums, 72 BPM
-      return { bpm: 72, loops: [
-        sq(function(t,n){ if(n) m.triggerAttackRelease(n,'16n',t); },
-          ['C4','E4','G4','C5','G4','E4','C4',null,
-           'F4','A4','C5','F4','C5','A4','F4',null])
+      // Sehr ruhig — tiefes C-Dur-Arpeggio, keine Drums, 66 BPM
+      return { bpm: 66, loops: [
+        sq(function(t,n){ if(n) m.triggerAttackRelease(n,'8n',t); },
+          ['C3','E3','G3','C4','G3','E3','C3',null,
+           'F3','A3','C4','F3','C4','A3','F3',null])
       ]};
     }
     if (n === 2) {
-      // Etwas Bewegung — G-Dur + Bass, 84 BPM
-      return { bpm: 84, loops: [
+      // Etwas Bewegung — G-Dur tief + Bass, 78 BPM
+      return { bpm: 78, loops: [
         sq(function(t,n){ if(n) m.triggerAttackRelease(n,'16n',t); },
-          ['G4','B4','D5','G5','D5','B4','G4',null,
-           'C5','E5','G5','E5','C5','B4','A4',null]),
+          ['G3','B3','D4','G4','D4','B3','G3',null,
+           'C4','E4','G4','E4','C4','B3','A3',null]),
         sq(function(t,n){ if(n) b.triggerAttackRelease(n,'4n',t); },
           ['G2',null,null,null,'G2',null,null,null,
-           'C3',null,null,null,'G3',null,null,null])
+           'C3',null,null,null,'G2',null,null,null])
       ]};
     }
     if (n === 3) {
-      // Spannung steigt — a-Moll + Kick, 100 BPM
-      return { bpm: 100, loops: [
+      // Spannung steigt — a-Moll tief + Kick, 92 BPM
+      return { bpm: 92, loops: [
         sq(function(t,n){ if(n) m.triggerAttackRelease(n,'16n',t); },
-          ['A4','C5','E5','A5','E5','C5','A4',null,
-           'G4','B4','D5','G5','D5','B4','G4',null]),
+          ['A3','C4','E4','A4','E4','C4','A3',null,
+           'G3','B3','D4','G4','D4','B3','G3',null]),
         sq(function(t,n){ if(n) b.triggerAttackRelease(n,'4n',t); },
           ['A2',null,null,null,'A2',null,null,null,
            'E2',null,null,null,'E2',null,null,null]),
@@ -200,11 +202,11 @@ const SoundSystem = {
       ]};
     }
     if (n === 4) {
-      // Dringend — a-Moll + Chromatik + Snare, 116 BPM
-      return { bpm: 116, loops: [
+      // Dringend — a-Moll + Chromatik + Snare, 108 BPM
+      return { bpm: 108, loops: [
         sq(function(t,n){ if(n) m.triggerAttackRelease(n,'16n',t); },
-          ['A4','C5','E5','A5','G#5','E5','C5','B4',
-           'A4','G4','F4','G4','A4','C5','E5',null]),
+          ['A3','C4','E4','A4','G#4','E4','C4','B3',
+           'A3','G3','F3','G3','A3','C4','E4',null]),
         sq(function(t,n){ if(n) b.triggerAttackRelease(n,'8n',t); },
           ['A2',null,'A2',null,'E2',null,'E2',null,
            'F2',null,'F2',null,'E2',null,'E2',null]),
@@ -216,11 +218,11 @@ const SoundSystem = {
            null,null,null,null,'C1',null,null,null])
       ]};
     }
-    // Tier 5 — maximale Spannung, volle Drums, 134 BPM
-    return { bpm: 134, loops: [
+    // Tier 5 — maximale Spannung, volle Drums, 126 BPM
+    return { bpm: 126, loops: [
       sq(function(t,n){ if(n) m.triggerAttackRelease(n,'16n',t); },
-        ['A5','G5','F5','E5','D5','C5','B4','A4',
-         'G#4','A4','B4','C5','D5','E5','F5','G5']),
+        ['A4','G4','F4','E4','D4','C4','B3','A3',
+         'G#3','A3','B3','C4','D4','E4','F4','G4']),
       sq(function(t,n){ if(n) b.triggerAttackRelease(n,'16n',t); },
         ['A2','A2','E2','E2','F2','F2','E2','E2',
          'A1','A1','E2','E2','F2','F2','E2','E2']),
@@ -811,16 +813,20 @@ function generateTasks() {
 function updateHUD() {
   var lvl = $('hud-level'), scr = $('hud-score'), tsk = $('hud-task');
   if (lvl) lvl.textContent = G.level;
-  if (scr) scr.textContent = G.score;
+  if (scr) scr.textContent = G.trainingMode ? '–' : G.score;
   if (tsk) tsk.textContent = Math.min(G.taskIdx + 1, 5) + '/5';
 
   var heartsDiv = $('hud-hearts');
   if (heartsDiv) {
-    var h = '';
-    for (var i = 0; i < G.maxLives; i++) {
-      h += '<span class="heart ' + (i < G.lives ? 'full' : 'lost') + '">' + (i < G.lives ? '❤️' : '🖤') + '</span>';
+    if (G.trainingMode) {
+      heartsDiv.innerHTML = '<span class="training-badge">📚 Training</span>';
+    } else {
+      var h = '';
+      for (var i = 0; i < G.maxLives; i++) {
+        h += '<span class="heart ' + (i < G.lives ? 'full' : 'lost') + '">' + (i < G.lives ? '❤️' : '🖤') + '</span>';
+      }
+      heartsDiv.innerHTML = h;
     }
-    heartsDiv.innerHTML = h;
   }
 }
 
@@ -838,10 +844,16 @@ function updateTimeBar(percent) {
 // =====================================================================
 function startTimer() {
   clearInterval(G.timer);
+  SoundSystem.startLevelMusic(G.level);
+  if (G.trainingMode) {
+    var fill = $('time-fill'), txt = $('time-text');
+    if (fill) { fill.style.width = '100%'; fill.style.background = '#4CAF50'; }
+    if (txt)  txt.textContent = '∞';
+    return;
+  }
   G.totalTime = Math.max(13, 23 - G.level);
   G.timeLeft = G.totalTime;
   SoundSystem.lastWarningTime = 0;
-  SoundSystem.startLevelMusic(G.level);
   updateTimeBar(1);
 
   var TICK = 100;
@@ -962,10 +974,10 @@ function correctAns() {
 }
 
 function wrongAns() {
-  // Lose a life on wrong answer
-  G.lives--;
   SoundSystem.playWrong();
   flash('rgba(231,76,60,0.35)');
+
+  if (!G.trainingMode) G.lives--;
 
   var inp = $('answer-input');
   if (inp) {
@@ -975,7 +987,7 @@ function wrongAns() {
   }
   updateHUD();
 
-  if (G.lives <= 0) {
+  if (!G.trainingMode && G.lives <= 0) {
     setTimeout(function() { stopTimer(); gameOver(); }, 400);
   }
 }
@@ -1017,10 +1029,19 @@ function victory() {
   SoundSystem.playVictory();
   G.totalElapsed = (Date.now() - G.gameStartTime) / 1000;
   var vs = $('victory-score'), vt = $('victory-time');
-  if (vs) vs.textContent = G.score;
+  var titleEl = document.querySelector('#screen-victory .overlay-title');
+  var subEl   = document.querySelector('#screen-victory .overlay-sub');
+  if (G.trainingMode) {
+    if (titleEl) titleEl.textContent = 'TRAINING ABGESCHLOSSEN!';
+    if (subEl)   subEl.innerHTML = '🎉 Alle Level gemeistert!<br>Super gemacht!';
+    if (vs) vs.textContent = '–';
+  } else {
+    if (titleEl) titleEl.textContent = 'ALLE LEVEL GESCHAFFT!';
+    if (subEl)   subEl.innerHTML = '⭐ <span id="victory-score">' + G.score + '</span> Punkte in <span id="victory-time">' + Math.floor(G.totalElapsed) + 's</span><br>Score automatisch gespeichert!';
+    if (vs) vs.textContent = G.score;
+    autoSaveScore();
+  }
   if (vt) vt.textContent = Math.floor(G.totalElapsed) + 's';
-  // auto-save
-  autoSaveScore();
   showScreen('screen-victory');
 }
 
@@ -1139,6 +1160,7 @@ function goToMenu() {
   SoundSystem.stopMusic();
   SoundSystem.playClick();
   G.selectedHero = null; G.playerName = '';
+  G.trainingMode = false;
   tryEnableStart();
   showScreen('screen-menu');
   SoundSystem.startMenuMusic();
@@ -1213,8 +1235,21 @@ function initGame() {
   // --- Menu ---
   $('btn-play').addEventListener('click', function() {
     SoundSystem.playClick();
+    G.trainingMode = false;
+    var startBtn = $('btn-start-game');
+    if (startBtn) startBtn.innerHTML = 'SPIELEN ▶';
     renderHeroSelect();
-    // Prefill name if returning
+    var ni = $('hero-name-input');
+    if (ni) ni.value = G.playerName || '';
+    showScreen('screen-hero-select');
+  });
+
+  $('btn-training').addEventListener('click', function() {
+    SoundSystem.playClick();
+    G.trainingMode = true;
+    var startBtn = $('btn-start-game');
+    if (startBtn) startBtn.innerHTML = 'TRAINING ▶';
+    renderHeroSelect();
     var ni = $('hero-name-input');
     if (ni) ni.value = G.playerName || '';
     showScreen('screen-hero-select');
