@@ -43,14 +43,15 @@ const SoundSystem = {
       await Tone.start();
       if (this._ready) return;
 
-      const verb = new Tone.Reverb({ decay: 3.2, wet: 0.38 }).toDestination();
+      this._verb = new Tone.Reverb({ decay: 2.0, wet: 0.18 }).toDestination();
+      var verb = this._verb;  // local alias so .connect(verb) calls below stay unchanged
 
-      // Melodie-Synth (PolySynth für überlappende SFX-Noten)
+      // Melodie-Synth — Basis: sine; wird per Tier auf sawtooth/square umgeschaltet
       this._mel = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: 'triangle' },
-        envelope: { attack: 0.05, decay: 0.2, sustain: 0.5, release: 1.0 }
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.05, decay: 0.18, sustain: 0.4, release: 0.5 }
       }).connect(verb);
-      this._mel.volume.value = -11;
+      this._mel.volume.value = -12;
 
       // Bass-Synth
       this._bass = new Tone.Synth({
@@ -151,17 +152,43 @@ const SoundSystem = {
     if (!this._ready) return;
     this._stopLoops();
 
-    var cfg = level <= 2 ? this._tier(1)
-            : level <= 4 ? this._tier(2)
-            : level <= 6 ? this._tier(3)
-            : level <= 8 ? this._tier(4)
-            :               this._tier(5);
+    var t = level <= 2 ? 1 : level <= 4 ? 2 : level <= 6 ? 3 : level <= 8 ? 4 : 5;
+    this._setSynthTier(t);
+
+    var cfg = t === 1 ? this._tier(1)
+            : t === 2 ? this._tier(2)
+            : t === 3 ? this._tier(3)
+            : t === 4 ? this._tier(4)
+            :            this._tier(5);
 
     this._baseBpm = cfg.bpm;
     Tone.Transport.bpm.value = cfg.bpm;
     var self = this;
     cfg.loops.forEach(function(l){ l.start(0); self._loops.push(l); });
     Tone.Transport.start();
+  },
+
+  // Schaltet Klangcharakter je Tier um: von weich/ambient zu scharf/8-bit/elektronisch
+  _setSynthTier(n) {
+    // Oszillator-Typen: sine=weich → triangle → sawtooth=scharf → square=8-bit → fatsawtooth=fett
+    var osc  = [null, 'sine',      'triangle', 'sawtooth', 'square',  'sawtooth'];
+    var bOsc = [null, 'sine',      'sine',     'triangle', 'sawtooth','sawtooth'];
+    var env  = [null,
+      { attack: 0.08, decay: 0.25, sustain: 0.5,  release: 0.8  }, // T1: sanft, lang
+      { attack: 0.04, decay: 0.18, sustain: 0.45, release: 0.45 }, // T2: warm, flüssig
+      { attack: 0.02, decay: 0.14, sustain: 0.35, release: 0.25 }, // T3: synthy, punch
+      { attack: 0.008,decay: 0.10, sustain: 0.28, release: 0.12 }, // T4: 8-bit, trocken
+      { attack: 0.005,decay: 0.08, sustain: 0.25, release: 0.08 }  // T5: aggressiv, knackig
+    ];
+    var wet  = [null, 0.28, 0.20, 0.14, 0.09, 0.07];
+    var vol  = [null, -14,  -12,  -11,  -10,  -9  ];
+
+    try {
+      if (this._mel)  { this._mel.set({ oscillator: { type: osc[n] }, envelope: env[n] });
+                        this._mel.volume.value  = vol[n]; }
+      if (this._bass) { this._bass.set({ oscillator: { type: bOsc[n] } }); }
+      if (this._verb) { this._verb.wet.value = wet[n]; }
+    } catch(e) {}
   },
 
   _tier(n) {
@@ -988,7 +1015,8 @@ function checkAnswer() {
 }
 
 function correctAns() {
-  stopTimer();
+  clearInterval(G.timer);      // stop countdown only — music keeps running
+  SoundSystem.setTempo(1);     // reset any time-warning tempo boost
   SoundSystem.playCorrect();
   var inp = $('answer-input');
   if (inp) inp.className = 'correct';
