@@ -169,70 +169,75 @@ const SoundSystem = {
     function sq(cb, arr) { return new Tone.Sequence(cb, arr, '8n'); }
 
     if (n === 1) {
-      // Sehr ruhig — tiefes C-Dur-Arpeggio, keine Drums, 66 BPM
-      return { bpm: 66, loops: [
-        sq(function(t,n){ if(n) m.triggerAttackRelease(n,'8n',t); },
-          ['C3','E3','G3','C4','G3','E3','C3',null,
-           'F3','A3','C4','F3','C4','A3','F3',null])
+      // Tier 1 — C-Dur, 60 BPM: traumhaft langsam, breite Noten, nur Melodie
+      // Charakter: Ambient-Lullaby — sehr entspannt, fast schwebend
+      return { bpm: 60, loops: [
+        sq(function(t,v){ if(v) m.triggerAttackRelease(v,'4n.',t); },
+          ['C3',null,'E3',null,'G3',null,'C4',null,
+           'G3',null,'E3',null,'A3',null,'G3',null])
       ]};
     }
     if (n === 2) {
-      // Etwas Bewegung — G-Dur tief + Bass, 78 BPM
-      return { bpm: 78, loops: [
-        sq(function(t,n){ if(n) m.triggerAttackRelease(n,'16n',t); },
-          ['G3','B3','D4','G4','D4','B3','G3',null,
-           'C4','E4','G4','E4','C4','B3','A3',null]),
-        sq(function(t,n){ if(n) b.triggerAttackRelease(n,'4n',t); },
-          ['G2',null,null,null,'G2',null,null,null,
-           'C3',null,null,null,'G2',null,null,null])
+      // Tier 2 — F-Dur, 80 BPM: beschwingter Marsch, Walking Bass, keine Drums
+      // Charakter: Fröhlich-tänzerisch — eine neue Tonart bringt Frische
+      return { bpm: 80, loops: [
+        sq(function(t,v){ if(v) m.triggerAttackRelease(v,'8n',t); },
+          ['F3','A3','C4','F4','C4','A3','Bb3','G3',
+           'F3','C4','E4','F4','D4','C4','A3',null]),
+        sq(function(t,v){ if(v) b.triggerAttackRelease(v,'4n',t); },
+          ['F2',null,null,null,'Bb2',null,null,null,
+           'C3',null,null,null,'F2',null,null,null])
       ]};
     }
     if (n === 3) {
-      // Spannung steigt — a-Moll tief + Kick, 92 BPM
-      return { bpm: 92, loops: [
-        sq(function(t,n){ if(n) m.triggerAttackRelease(n,'16n',t); },
-          ['A3','C4','E4','A4','E4','C4','A3',null,
-           'G3','B3','D4','G4','D4','B3','G3',null]),
-        sq(function(t,n){ if(n) b.triggerAttackRelease(n,'4n',t); },
-          ['A2',null,null,null,'A2',null,null,null,
-           'E2',null,null,null,'E2',null,null,null]),
-        sq(function(t,n){ if(n) k.triggerAttackRelease(n,'8n',t); },
-          ['C1',null,'C1',null,'C1',null,'C1',null,
-           'C1',null,'C1',null,'C1',null,'C1',null])
+      // Tier 3 — a-Moll, 95 BPM: synkopiert (Offbeat-Start), Bass-Walk, Kick
+      // Charakter: Treibend-nervös — Einsatz NACH dem Beat schafft Unruhe
+      return { bpm: 95, loops: [
+        sq(function(t,v){ if(v) m.triggerAttackRelease(v,'8n',t); },
+          [null,'A3','C4',null,'E4','A4',null,'G4',
+           null,'F4','E4',null,'D4','C4',null,'B3']),
+        sq(function(t,v){ if(v) b.triggerAttackRelease(v,'8n',t); },
+          ['A2',null,'A2','E2',null,'A2',null,'G2',
+           'F2',null,'F2','C2',null,'E2',null,'A1']),
+        sq(function(t,v){ if(v) k.triggerAttackRelease(v,'8n',t); },
+          ['C1',null,null,'C1',null,null,'C1',null,
+           'C1',null,null,'C1',null,null,'C1',null])
       ]};
     }
     if (n === 4) {
-      // Dringend — a-Moll + Chromatik + Snare, 108 BPM
-      return { bpm: 108, loops: [
-        sq(function(t,n){ if(n) m.triggerAttackRelease(n,'16n',t); },
-          ['A3','C4','E4','A4','G#4','E4','C4','B3',
-           'A3','G3','F3','G3','A3','C4','E4',null]),
-        sq(function(t,n){ if(n) b.triggerAttackRelease(n,'8n',t); },
-          ['A2',null,'A2',null,'E2',null,'E2',null,
-           'F2',null,'F2',null,'E2',null,'E2',null]),
-        sq(function(t,n){ if(n) k.triggerAttackRelease(n,'8n',t); },
-          ['C1',null,'C1',null,'C1',null,'C1',null,
-           'C1',null,'C1',null,'C1',null,'C1',null]),
-        sq(function(t,n){ if(n) s.triggerAttackRelease('16n',t); },
+      // Tier 4 — e-Moll, 112 BPM: abst. Skalen-Läufe, Kick + Snare, dramatisch
+      // Charakter: Dringend-heroisch — neue Tonart + schnelle Skala = echter Stilwechsel
+      return { bpm: 112, loops: [
+        sq(function(t,v){ if(v) m.triggerAttackRelease(v,'16n',t); },
+          ['B4','A4','G4','F#4','E4','D4','C4','B3',
+           'A3','G3','F#3','E3','F#3','G3','A3','B3']),
+        sq(function(t,v){ if(v) b.triggerAttackRelease(v,'8n',t); },
+          ['E2',null,'B2',null,'C3',null,'G2',null,
+           'A2',null,'E2',null,'B1',null,'E2',null]),
+        sq(function(t,v){ if(v) k.triggerAttackRelease(v,'8n',t); },
+          ['C1',null,null,null,'C1',null,null,null,
+           'C1',null,null,null,'C1',null,null,null]),
+        sq(function(t,v){ if(v) s.triggerAttackRelease('16n',t); },
           [null,null,null,null,'C1',null,null,null,
            null,null,null,null,'C1',null,null,null])
       ]};
     }
-    // Tier 5 — maximale Spannung, volle Drums, 126 BPM
-    return { bpm: 126, loops: [
-      sq(function(t,n){ if(n) m.triggerAttackRelease(n,'16n',t); },
-        ['A4','G4','F4','E4','D4','C4','B3','A3',
-         'G#3','A3','B3','C4','D4','E4','F4','G4']),
-      sq(function(t,n){ if(n) b.triggerAttackRelease(n,'16n',t); },
-        ['A2','A2','E2','E2','F2','F2','E2','E2',
-         'A1','A1','E2','E2','F2','F2','E2','E2']),
-      sq(function(t,n){ if(n) k.triggerAttackRelease(n,'8n',t); },
+    // Tier 5 — d-Moll, 128 BPM: chromat. Abstieg, volle Drums + Hi-Hat, episch
+    // Charakter: Episch-dramatisch — Chromatik + Gegenstimme + Hi-Hat = maximale Spannung
+    return { bpm: 128, loops: [
+      sq(function(t,v){ if(v) m.triggerAttackRelease(v,'16n',t); },
+        ['D4','C4','Bb3','A3','G#3','A3','C4','D4',
+         'F4','A4','D5','C5','Bb4','A4','G#4','A4']),
+      sq(function(t,v){ if(v) b.triggerAttackRelease(v,'8n',t); },
+        ['D2',null,'A2',null,'Bb2',null,'A2',null,
+         'D2',null,'F2',null,'A2',null,'Bb2',null]),
+      sq(function(t,v){ if(v) k.triggerAttackRelease(v,'8n',t); },
         ['C1',null,'C1',null,'C1',null,'C1',null,
          'C1','C1','C1',null,'C1',null,'C1',null]),
-      sq(function(t,n){ if(n) s.triggerAttackRelease('32n',t); },
+      sq(function(t,v){ if(v) s.triggerAttackRelease('32n',t); },
         [null,null,null,null,'C1',null,null,null,
          null,null,null,null,'C1',null,'C1',null]),
-      sq(function(t,n){ if(n) h.triggerAttackRelease('C6','32n',t); },
+      sq(function(t,v){ if(v) h.triggerAttackRelease('C6','32n',t); },
         ['C1','C1','C1','C1','C1','C1','C1','C1',
          'C1','C1','C1','C1','C1','C1','C1','C1'])
     ]};
@@ -733,6 +738,7 @@ function doAttackAnimation(isSuper) {
     spawnProjectiles(true);
     setTimeout(function() {
       enemySprite.classList.add('enemy-dead');
+      spawnDefeatStars();
     }, 350);
     setTimeout(function() {
       playerSprite.classList.remove('super-attack');
@@ -749,6 +755,32 @@ function doAttackAnimation(isSuper) {
       enemySprite.classList.remove('enemy-hurt');
     }, 400);
   }
+}
+
+function spawnDefeatStars() {
+  var arena = document.querySelector('.battle-arena');
+  var enemyEl = document.getElementById('enemy-sprite');
+  if (!arena || !enemyEl) return;
+  var aRect = arena.getBoundingClientRect();
+  var eRect = enemyEl.getBoundingClientRect();
+  var cx = eRect.left - aRect.left + eRect.width / 2;
+  var cy = eRect.top  - aRect.top  + eRect.height / 2;
+  var icons = ['⭐','🌟','✨','💫','🎉','⭐','🌟','💥'];
+  icons.forEach(function(icon, i) {
+    var el = document.createElement('div');
+    el.textContent = icon;
+    var angle = (i / icons.length) * 360;
+    var dist  = 65 + Math.random() * 45;
+    var dx = Math.cos(angle * Math.PI / 180) * dist;
+    var dy = Math.sin(angle * Math.PI / 180) * dist;
+    el.style.cssText =
+      'position:absolute;left:' + cx + 'px;top:' + cy + 'px;' +
+      'font-size:1.8rem;z-index:30;pointer-events:none;' +
+      '--dx:' + dx + 'px;--dy:' + dy + 'px;' +
+      'animation:starPop 0.9s ' + (i * 0.055) + 's both ease-out;';
+    arena.appendChild(el);
+    setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 1100 + i * 60);
+  });
 }
 
 function spawnProjectiles(isSuper) {
@@ -887,12 +919,16 @@ function stopTimer() {
 // GAME LOGIC
 // =====================================================================
 function timeUp() {
+  if (G.trainingMode) return;
   G.lives--;
   SoundSystem.playLifeLost();
   flash('rgba(255,0,0,0.35)');
   updateHUD();
-  if (G.lives <= 0) gameOver();
-  else showScreen('screen-timeout');
+  if (G.lives <= 0) {
+    setTimeout(function() { stopTimer(); gameOver(); }, 400);
+  } else {
+    showScreen('screen-timeout');
+  }
 }
 
 function showTask() {
