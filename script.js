@@ -125,31 +125,65 @@ const SoundSystem = {
     if (!this._ready) return;
     this._stopLoops();
 
-    // Immer auf weichen Menü-Preset zurücksetzen — sonst klingt es nach hartem Game-Tier
+    // Reset synths to soft menu preset (avoid harsh tier from previous game)
     try {
       this._mel.set({ oscillator: { type: 'triangle' },
-                      envelope: { attack: 0.10, decay: 0.28, sustain: 0.50, release: 1.0 } });
-      this._mel.volume.value = -15;
-      if (this._bass) this._bass.set({ oscillator: { type: 'sine' } });
-      this._bass.volume.value = -16;
-      if (this._verb) this._verb.wet.value = 0.28;
+                      envelope: { attack: 0.08, decay: 0.25, sustain: 0.55, release: 1.2 } });
+      this._mel.volume.value = -14;
+      if (this._bass) this._bass.set({ oscillator: { type: 'sine' },
+                      envelope: { attack: 0.05, decay: 0.20, sustain: 0.60, release: 0.80 } });
+      this._bass.volume.value = -15;
+      if (this._pad) this._pad.set({ oscillator: { type: 'triangle' } });
+      this._pad.volume.value = -20;
+      if (this._verb) this._verb.wet.value = 0.32;
     } catch(e) {}
 
-    this._baseBpm = 68;
-    Tone.Transport.bpm.value = 68;
-
-    // Ruhige, tiefe C-Dur-Melodie – fällt sanft ab und wiederholt sich variiert
-    var mel  = ['G3',null,'E3','G3','C4','B3','A3',null,'G3','F3','E3',null,'D3',null,'C3',null];
-    var bass = ['C2',null,null,null,'F2',null,null,null,'C2',null,null,null,'G2',null,null,null];
-    var pad  = [['C3','G3'],null,null,null,['F3','A3'],null,null,null,
-                ['C3','E3'],null,null,null,['G2','D3'],null,null,null];
+    this._baseBpm = 84;
+    Tone.Transport.bpm.value = 84;
 
     var m = this._mel, b = this._bass, p = this._pad;
-    var s1 = new Tone.Sequence(function(t,n){ if(n) m.triggerAttackRelease(n,'8n',t); }, mel, '8n');
-    var s2 = new Tone.Sequence(function(t,n){ if(n) b.triggerAttackRelease(n,'2n',t); }, bass,'8n');
-    var s3 = new Tone.Sequence(function(t,n){ if(n) p.triggerAttackRelease(n,'2n',t); }, pad, '8n');
+    var k = this._kick, sn = this._snare, h = this._hihat;
+
+    // Lively C-major melody — two 8-bar phrases that complement each other
+    var mel = [
+      'C4','E4','G4','E4','A4','G4','E4','C4',
+      'D4','F4','A4','F4','Bb4','A4','G4','F4',
+      'E4','G4','C5','B4','A4','G4','F4','E4',
+      'D4','C4','E4','G4','C4',null,null,null
+    ];
+    // Walking bass line
+    var bass = [
+      'C2',null,'C2',null,'F2',null,'F2',null,
+      'G2',null,'G2',null,'C2',null,'C2',null,
+      'A2',null,'A2',null,'F2',null,'F2',null,
+      'G2',null,'G2',null,'C2',null,null,null
+    ];
+    // Pad chords — held long for warmth
+    var pad = [
+      ['C3','E3','G3'],null,null,null,['F3','A3','C4'],null,null,null,
+      ['G3','B3','D4'],null,null,null,['C3','E3','G3'],null,null,null,
+      ['A3','C4','E4'],null,null,null,['F3','A3','C4'],null,null,null,
+      ['G3','B3','D4'],null,null,null,['C3','E3','G3'],null,null,null
+    ];
+    // Kick on 1 and 3 (every 4 eighth-notes = quarter note positions)
+    var kick = [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0].map(function(v){ return v?'C1':null; });
+    // Snare on 2 and 4
+    var snare= [0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0].map(function(v){ return v?'C1':null; });
+    // Hihat eighth-note pulse (quieter on off-beats)
+    var hihat= ['C3','C3','C3','C3','C3','C3','C3','C3',
+                'C3','C3','C3','C3','C3','C3','C3','C3'];
+
+    function sq(cb,arr){ return new Tone.Sequence(cb,arr,'8n'); }
     var self = this;
-    [s1,s2,s3].forEach(function(s){ s.start(0); self._loops.push(s); });
+    var loops = [
+      sq(function(t,n){ if(n) m.triggerAttackRelease(n,'8n',t); }, mel),
+      sq(function(t,n){ if(n) b.triggerAttackRelease(n,'4n',t); }, bass),
+      sq(function(t,n){ if(n) p.triggerAttackRelease(n,'2n',t); }, pad),
+      sq(function(t,n){ if(n) k.triggerAttackRelease('C1','8n',t); }, kick),
+      sq(function(t,n){ if(n) sn.triggerAttackRelease('8n',t); }, snare),
+      sq(function(t,n){ if(n) h.triggerAttackRelease('16n',t); }, hihat)
+    ];
+    loops.forEach(function(s){ s.start(0); self._loops.push(s); });
     Tone.Transport.start();
   },
 
@@ -372,10 +406,40 @@ document.addEventListener('click', async function() {
 // CHARACTERS & ENEMIES
 // =====================================================================
 var CHARACTERS = [
-  { name: 'Katzen-Hexe',  color: '#8e24aa' },   // female – cat wizard
-  { name: 'Robo-Rika',    color: '#00838f' },   // female – robot
-  { name: 'Ritter Leo',   color: '#1565c0' },   // male   – knight
-  { name: 'Fuchs-Ranger', color: '#388e3c' }    // male   – fox scout
+  { name: 'Katzen-Hexe',  color: '#8e24aa' },
+  { name: 'Robo-Rika',    color: '#00838f' },
+  { name: 'Ritter Leo',   color: '#1565c0' },
+  { name: 'Fuchs-Ranger', color: '#388e3c' }
+];
+
+// One enemy per level (10 total), name + defeat message ({name} = player name)
+var ENEMIES = [
+  null,
+  { name: 'Baby-Blob',        msg: 'Super gemacht, {name}! Du warst viel stärker als ich! Viel Erfolg noch! 😊' },
+  { name: 'Schleim',          msg: 'Wow, {name}! Ich hatte keine Chance! Mach weiter so! ⭐' },
+  { name: 'Mini-Imp',         msg: 'Nicht schlecht, {name}! Aber die Nächsten sind nicht so nett wie ich... 😏' },
+  { name: 'Kobold',           msg: 'Hmpf! {name} hat mich besiegt! Das nächste Mal bin ich bereit! 😤' },
+  { name: 'Geist',            msg: 'Du glaubst, das wars, {name}? Die echte Herausforderung kommt noch! 👻' },
+  { name: 'Stein-Golem',      msg: 'Krrk... {name}... du bist stärker als erwartet. Meine Freunde sind mächtiger! 💢' },
+  { name: 'Knochen-Ritter',   msg: 'NEIN! {name} hat mich besiegt! Du... wirst... es... bereuen! 💀' },
+  { name: 'Feuer-Drache',     msg: '{name}... Du wagst es?! Der Boss wird dich VERNICHTEN! 🔥😡' },
+  { name: 'Schatten-Phantom', msg: 'Unmöglich... {name}... Kein Mensch schafft es so weit. Hier endet dein Weg! 👁️' },
+  { name: 'Mathe-Zauberer',   msg: 'Das... ist unmöglich! {name} ist der wahre Math Hero! 🏆✨' }
+];
+
+// Progressive backgrounds per level: calm → wild/threatening (child-safe)
+var LEVEL_BG = [
+  null,
+  'linear-gradient(180deg,#87ceeb 0%,#b8dff0 45%,#c8e6c9 100%)',            // L1 blauer Himmel
+  'linear-gradient(180deg,#fffde7 0%,#ffe082 40%,#a5d6a7 100%)',             // L2 sonnige Wiese
+  'linear-gradient(180deg,#ffccbc 0%,#ff8a65 40%,#6d4c41 100%)',             // L3 Herbst-Dämmerung
+  'linear-gradient(180deg,#e8eaf6 0%,#7e57c2 45%,#311b92 100%)',             // L4 Abenddämmerung
+  'linear-gradient(180deg,#1b5e20 0%,#0a2b0a 55%,#050a00 100%)',             // L5 Dunkler Wald
+  'linear-gradient(180deg,#1a237e 0%,#0d1041 50%,#000000 100%)',             // L6 Sturmnacht
+  'linear-gradient(180deg,#b71c1c 0%,#e64a19 35%,#1c0000 100%)',             // L7 Vulkan-Glut
+  'linear-gradient(180deg,#0d0d0d 0%,#1a1a2e 40%,#0f3460 100%)',             // L8 Gewittersturm
+  'linear-gradient(180deg,#1a0033 0%,#4a0072 45%,#0d0015 100%)',             // L9 Unterwelt
+  'linear-gradient(180deg,#0d0015 0%,#1a0033 30%,#4a0008 65%,#000 100%)',   // L10 Chaos
 ];
 
 function getCharSVG(index) {
@@ -556,8 +620,28 @@ function getCharSVG(index) {
 }
 
 function getEnemySVG(level) {
-  // Level 1-2: Schleim (cute green slime)
-  if (level <= 2) return '<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">'
+  // ── Level 1: Baby-Blob ─────────────────────────────────────────────────────
+  if (level === 1) return '<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">'
+    + '<ellipse cx="50" cy="73" rx="30" ry="28" fill="#ff8fab"/>'
+    + '<ellipse cx="50" cy="71" rx="26" ry="24" fill="#ffb3c6"/>'
+    + '<path d="M23 70 Q16 63 20 54" stroke="#ff8fab" stroke-width="6" fill="none" stroke-linecap="round"/>'
+    + '<path d="M77 70 Q84 63 80 54" stroke="#ff8fab" stroke-width="6" fill="none" stroke-linecap="round"/>'
+    + '<circle cx="38" cy="67" r="10" fill="white"/>'
+    + '<circle cx="62" cy="67" r="10" fill="white"/>'
+    + '<circle cx="39" cy="68" r="6" fill="#6c63ff"/>'
+    + '<circle cx="63" cy="68" r="6" fill="#6c63ff"/>'
+    + '<circle cx="40.5" cy="66.5" r="2.2" fill="white"/>'
+    + '<circle cx="64.5" cy="66.5" r="2.2" fill="white"/>'
+    + '<ellipse cx="30" cy="75" rx="5.5" ry="3.5" fill="#ff4d7d" opacity="0.45"/>'
+    + '<ellipse cx="70" cy="75" rx="5.5" ry="3.5" fill="#ff4d7d" opacity="0.45"/>'
+    + '<path d="M40 81 Q50 91 60 81" stroke="#c0306a" fill="none" stroke-width="2.5" stroke-linecap="round"/>'
+    + '<text x="44" y="78" font-size="11" fill="#c0306a" opacity="0.35" font-weight="bold">+</text>'
+    + '<text x="14" y="56" font-size="15" fill="#ffb3c6">⭐</text>'
+    + '<text x="71" y="52" font-size="13" fill="#ffb3c6">✨</text>'
+    + '</svg>';
+
+  // ── Level 2: Schleim ──────────────────────────────────────────────────────
+  if (level === 2) return '<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">'
     + '<path d="M14 78 Q9 54 18 44 Q28 28 50 26 Q72 28 82 44 Q91 54 86 78 Q81 100 65 108 Q50 114 35 108 Q19 100 14 78Z" fill="#66bb6a"/>'
     + '<path d="M19 76 Q15 56 23 47 Q33 33 50 31 Q67 33 77 47 Q85 56 81 76 Q76 95 62 104 Q50 109 38 104 Q24 95 19 76Z" fill="#81c784"/>'
     + '<circle cx="22" cy="52" r="5" fill="#a5d6a7" opacity="0.6"/>'
@@ -577,8 +661,35 @@ function getEnemySVG(level) {
     + '<text x="43" y="108" font-size="10" fill="#2e7d32" opacity="0.6">=?</text>'
     + '</svg>';
 
-  // Level 3-4: Kobold (goblin)
-  if (level <= 4) return '<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">'
+  // ── Level 3: Mini-Imp ─────────────────────────────────────────────────────
+  if (level === 3) return '<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">'
+    + '<rect x="33" y="96" width="13" height="22" rx="5" fill="#e53935"/>'
+    + '<rect x="54" y="96" width="13" height="22" rx="5" fill="#e53935"/>'
+    + '<ellipse cx="50" cy="82" rx="22" ry="26" fill="#e53935"/>'
+    + '<ellipse cx="50" cy="80" rx="18" ry="22" fill="#ef9a9a"/>'
+    + '<path d="M28 80 Q15 74 18 62" stroke="#e53935" stroke-width="7" fill="none" stroke-linecap="round"/>'
+    + '<path d="M72 80 Q85 74 82 62" stroke="#e53935" stroke-width="7" fill="none" stroke-linecap="round"/>'
+    + '<path d="M29 74 Q12 58 18 40 Q25 54 30 70Z" fill="#b71c1c" opacity="0.85"/>'
+    + '<path d="M71 74 Q88 58 82 40 Q75 54 70 70Z" fill="#b71c1c" opacity="0.85"/>'
+    + '<ellipse cx="50" cy="48" rx="22" ry="20" fill="#e53935"/>'
+    + '<path d="M36 32 Q29 14 36 8 Q42 22 40 32Z" fill="#b71c1c"/>'
+    + '<path d="M64 32 Q71 14 64 8 Q58 22 60 32Z" fill="#b71c1c"/>'
+    + '<ellipse cx="41" cy="48" rx="8" ry="8.5" fill="#ffd600"/>'
+    + '<ellipse cx="59" cy="48" rx="8" ry="8.5" fill="#ffd600"/>'
+    + '<ellipse cx="41" cy="49" rx="4.5" ry="5" fill="#1a1a1a"/>'
+    + '<ellipse cx="59" cy="49" rx="4.5" ry="5" fill="#1a1a1a"/>'
+    + '<circle cx="42.5" cy="47.5" r="1.5" fill="white"/>'
+    + '<circle cx="60.5" cy="47.5" r="1.5" fill="white"/>'
+    + '<ellipse cx="50" cy="58" rx="4" ry="3" fill="#c62828"/>'
+    + '<path d="M39 63 Q50 72 61 63" stroke="#b71c1c" fill="#ef9a9a" stroke-width="1.5"/>'
+    + '<rect x="44" y="63" width="4" height="5" rx="1" fill="white"/>'
+    + '<rect x="52" y="63" width="4" height="5" rx="1" fill="white"/>'
+    + '<path d="M50 116 Q63 112 67 106 Q58 105 57 116" stroke="#c62828" stroke-width="4" fill="none" stroke-linecap="round"/>'
+    + '<text x="43" y="81" font-size="10" fill="#b71c1c" opacity="0.4" font-weight="bold">×</text>'
+    + '</svg>';
+
+  // ── Level 4: Kobold ──────────────────────────────────────────────────────
+  if (level === 4) return '<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">'
     + '<rect x="34" y="90" width="13" height="22" rx="4" fill="#558b2f"/>'
     + '<rect x="53" y="90" width="13" height="22" rx="4" fill="#558b2f"/>'
     + '<ellipse cx="40" cy="114" rx="10" ry="5" fill="#33691e"/>'
@@ -619,8 +730,28 @@ function getEnemySVG(level) {
     + '<rect x="52" y="46" width="4" height="5" rx="1" fill="#fff"/>'
     + '</svg>';
 
-  // Level 5-6: Stein-Golem (stone golem)
-  if (level <= 6) return '<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">'
+  // ── Level 5: Geist ───────────────────────────────────────────────────────
+  if (level === 5) return '<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">'
+    + '<path d="M18 60 Q20 28 50 24 Q80 28 82 60 L82 110 Q74 100 66 110 Q58 100 50 110 Q42 100 34 110 Q26 100 18 110Z" fill="#b0bec5"/>'
+    + '<path d="M22 62 Q24 34 50 30 Q76 34 78 62 L78 104 Q71 95 64 104 Q57 95 50 104 Q43 95 36 104 Q29 95 22 104Z" fill="#cfd8dc"/>'
+    + '<ellipse cx="50" cy="62" rx="24" ry="22" fill="#29b6f6" opacity="0.11"/>'
+    + '<ellipse cx="38" cy="60" rx="11" ry="13" fill="#263238"/>'
+    + '<ellipse cx="62" cy="60" rx="11" ry="13" fill="#263238"/>'
+    + '<ellipse cx="38" cy="60" rx="7" ry="9" fill="#26c6da" opacity="0.9"/>'
+    + '<ellipse cx="62" cy="60" rx="7" ry="9" fill="#26c6da" opacity="0.9"/>'
+    + '<circle cx="36" cy="57" r="2.5" fill="white" opacity="0.7"/>'
+    + '<circle cx="60" cy="57" r="2.5" fill="white" opacity="0.7"/>'
+    + '<path d="M38 78 Q44 83 50 78 Q56 83 62 78" stroke="#546e7a" fill="none" stroke-width="3" stroke-linecap="round"/>'
+    + '<polygon points="42,78 44,85 46,78" fill="#546e7a"/>'
+    + '<polygon points="50,78 52,85 54,78" fill="#546e7a"/>'
+    + '<circle cx="10" cy="50" r="5" fill="#90caf9" opacity="0.5"/>'
+    + '<circle cx="90" cy="42" r="3.5" fill="#90caf9" opacity="0.4"/>'
+    + '<circle cx="8" cy="70" r="3" fill="#90caf9" opacity="0.35"/>'
+    + '<text x="5" y="44" font-size="13" fill="#90caf9" opacity="0.6">×</text>'
+    + '</svg>';
+
+  // ── Level 6: Stein-Golem ─────────────────────────────────────────────────
+  if (level === 6) return '<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">'
     + '<rect x="27" y="92" width="19" height="24" rx="4" fill="#78909c"/>'
     + '<rect x="54" y="92" width="19" height="24" rx="4" fill="#78909c"/>'
     + '<path d="M31 96 Q33 104 30 110" stroke="#546e7a" stroke-width="1.5" fill="none"/>'
@@ -653,8 +784,42 @@ function getEnemySVG(level) {
     + '<path d="M34 44 Q50 47 66 44" stroke="#546e7a" stroke-width="2.5" fill="none"/>'
     + '</svg>';
 
-  // Level 7-8: Feuer-Drache (fire dragon)
-  if (level <= 8) return '<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">'
+  // ── Level 7: Knochen-Ritter ──────────────────────────────────────────────
+  if (level === 7) return '<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">'
+    + '<rect x="30" y="90" width="14" height="30" rx="5" fill="#e0e0e0"/>'
+    + '<rect x="56" y="90" width="14" height="30" rx="5" fill="#e0e0e0"/>'
+    + '<ellipse cx="37" cy="91" rx="9" ry="5.5" fill="#bdbdbd"/>'
+    + '<ellipse cx="63" cy="91" rx="9" ry="5.5" fill="#bdbdbd"/>'
+    + '<rect x="24" y="50" width="52" height="44" rx="9" fill="#bdbdbd"/>'
+    + '<rect x="28" y="54" width="44" height="36" rx="7" fill="#e0e0e0"/>'
+    + '<path d="M32 62 Q50 59 68 62" stroke="#bdbdbd" stroke-width="2" fill="none"/>'
+    + '<path d="M30 70 Q50 67 70 70" stroke="#bdbdbd" stroke-width="2" fill="none"/>'
+    + '<path d="M32 78 Q50 75 68 78" stroke="#bdbdbd" stroke-width="2" fill="none"/>'
+    + '<ellipse cx="50" cy="63" rx="7" ry="5" fill="#9e9e9e" opacity="0.4"/>'
+    + '<rect x="7" y="50" width="17" height="40" rx="7" fill="#bdbdbd"/>'
+    + '<rect x="76" y="50" width="17" height="40" rx="7" fill="#bdbdbd"/>'
+    + '<circle cx="15" cy="52" r="10" fill="#9e9e9e"/>'
+    + '<circle cx="85" cy="52" r="10" fill="#9e9e9e"/>'
+    + '<rect x="2" y="20" width="7" height="46" rx="3" fill="#78909c"/>'
+    + '<rect x="-2" y="34" width="15" height="5" rx="2" fill="#546e7a"/>'
+    + '<polygon points="2,20 5.5,8 9,20" fill="#90a4ae"/>'
+    + '<ellipse cx="50" cy="32" rx="23" ry="21" fill="#e0e0e0"/>'
+    + '<ellipse cx="50" cy="39" rx="16" ry="10" fill="#bdbdbd"/>'
+    + '<ellipse cx="39" cy="29" rx="9" ry="10" fill="#212121"/>'
+    + '<ellipse cx="61" cy="29" rx="9" ry="10" fill="#212121"/>'
+    + '<ellipse cx="39" cy="30" rx="6" ry="7" fill="#e53935" opacity="0.85"/>'
+    + '<ellipse cx="61" cy="30" rx="6" ry="7" fill="#e53935" opacity="0.85"/>'
+    + '<circle cx="39" cy="28" r="1.8" fill="white" opacity="0.55"/>'
+    + '<circle cx="61" cy="28" r="1.8" fill="white" opacity="0.55"/>'
+    + '<ellipse cx="50" cy="39" rx="3.5" ry="4.5" fill="#212121"/>'
+    + '<rect x="40" y="45" width="5" height="7" rx="1.5" fill="white"/>'
+    + '<rect x="47" y="45" width="5" height="7" rx="1.5" fill="white"/>'
+    + '<rect x="54" y="45" width="5" height="7" rx="1.5" fill="white"/>'
+    + '<text x="78" y="36" font-size="13" fill="#e53935" opacity="0.75" font-weight="bold">!</text>'
+    + '</svg>';
+
+  // ── Level 8: Feuer-Drache ────────────────────────────────────────────────
+  if (level === 8) return '<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">'
     + '<path d="M72 88 Q94 78 96 62 Q92 73 82 80 Q88 68 84 58 Q78 70 80 83 Q74 76 72 88Z" fill="#c62828"/>'
     + '<ellipse cx="52" cy="80" rx="31" ry="26" fill="#c62828"/>'
     + '<ellipse cx="52" cy="83" rx="19" ry="17" fill="#e57373"/>'
@@ -692,7 +857,42 @@ function getEnemySVG(level) {
     + '<text x="52" y="90" text-anchor="middle" font-size="9" fill="#ffd600" opacity="0.65">7x</text>'
     + '</svg>';
 
-  // Level 9-10: Mathe-Zauberer Boss (math sorcerer)
+  // ── Level 9: Schatten-Phantom ────────────────────────────────────────────
+  if (level === 9) return '<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">'
+    + '<defs>'
+    + '<radialGradient id="pg" cx="50%" cy="45%" r="50%"><stop offset="0%" stop-color="#4a0072"/><stop offset="100%" stop-color="#0d0015"/></radialGradient>'
+    + '</defs>'
+    + '<ellipse cx="50" cy="68" rx="38" ry="46" fill="url(#pg)" opacity="0.92"/>'
+    + '<path d="M12 114 Q18 95 14 80 Q22 98 20 112Z" fill="#0d0015" opacity="0.8"/>'
+    + '<path d="M88 114 Q82 95 86 80 Q78 98 80 112Z" fill="#0d0015" opacity="0.8"/>'
+    + '<path d="M50 114 Q36 100 30 86 Q40 99 38 112Z" fill="#1a0033" opacity="0.7"/>'
+    + '<path d="M50 114 Q64 100 70 86 Q60 99 62 112Z" fill="#1a0033" opacity="0.7"/>'
+    + '<ellipse cx="50" cy="60" rx="30" ry="36" fill="#1a0033"/>'
+    + '<path d="M20 75 Q10 58 18 42 Q16 55 22 52 Q18 63 26 60 Q22 70 20 75Z" fill="#4a0072" opacity="0.65"/>'
+    + '<path d="M80 75 Q90 58 82 42 Q84 55 78 52 Q82 63 74 60 Q78 70 80 75Z" fill="#4a0072" opacity="0.65"/>'
+    + '<ellipse cx="38" cy="52" rx="10" ry="8" fill="#1a0033"/>'
+    + '<ellipse cx="62" cy="52" rx="10" ry="8" fill="#1a0033"/>'
+    + '<ellipse cx="38" cy="52" rx="6.5" ry="5.5" fill="#9c27b0"/>'
+    + '<ellipse cx="62" cy="52" rx="6.5" ry="5.5" fill="#9c27b0"/>'
+    + '<ellipse cx="38" cy="52" rx="3.5" ry="4" fill="#e040fb"/>'
+    + '<ellipse cx="62" cy="52" rx="3.5" ry="4" fill="#e040fb"/>'
+    + '<circle cx="38" cy="51" r="1.5" fill="white" opacity="0.7"/>'
+    + '<circle cx="62" cy="51" r="1.5" fill="white" opacity="0.7"/>'
+    + '<path d="M40 66 Q50 62 60 66" stroke="#4a0072" fill="none" stroke-width="2.5" stroke-linecap="round"/>'
+    + '<line x1="42" y1="66" x2="42" y2="71" stroke="#6a1b9a" stroke-width="1.5"/>'
+    + '<line x1="47" y1="67" x2="47" y2="72" stroke="#6a1b9a" stroke-width="1.5"/>'
+    + '<line x1="53" y1="67" x2="53" y2="72" stroke="#6a1b9a" stroke-width="1.5"/>'
+    + '<line x1="58" y1="66" x2="58" y2="71" stroke="#6a1b9a" stroke-width="1.5"/>'
+    + '<circle cx="8" cy="48" r="5" fill="#4a0072" opacity="0.55"/>'
+    + '<circle cx="92" cy="48" r="5" fill="#4a0072" opacity="0.55"/>'
+    + '<circle cx="4" cy="62" r="3" fill="#7b1fa2" opacity="0.4"/>'
+    + '<circle cx="96" cy="62" r="3" fill="#7b1fa2" opacity="0.4"/>'
+    + '<circle cx="12" cy="38" r="2" fill="#e040fb" opacity="0.35"/>'
+    + '<circle cx="88" cy="38" r="2" fill="#e040fb" opacity="0.35"/>'
+    + '<text x="50" y="78" text-anchor="middle" font-size="10" fill="#e040fb" opacity="0.5" font-weight="bold">???</text>'
+    + '</svg>';
+
+  // ── Level 10: Mathe-Zauberer Boss ────────────────────────────────────────
   return '<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">'
     + '<path d="M13 46 Q5 35 9 24 Q13 34 17 31 Q13 41 19 39 Q15 47 21 45 Q17 53 13 52Z" fill="#7b1fa2" opacity="0.7"/>'
     + '<path d="M15 50 Q7 39 11 27 Q15 37 18 33 Q14 43 20 41 Q16 49 15 52Z" fill="#e040fb" opacity="0.45"/>'
@@ -999,21 +1199,38 @@ function showTask() {
   startTimer();
 }
 
+function setLevelBackground(level) {
+  var arena = document.querySelector('.battle-arena');
+  if (arena && LEVEL_BG[level]) arena.style.background = LEVEL_BG[level];
+}
+
 function updateSprites() {
-  var ps = $('player-sprite'), es = $('enemy-sprite'), badge = $('enemy-badge');
+  var ps = $('player-sprite'), es = $('enemy-sprite');
   if (ps && G.selectedHero !== null) {
     ps.innerHTML = getCharSVG(G.selectedHero);
     var nb = $('player-name-badge');
     if (nb) nb.textContent = G.playerName || CHARACTERS[G.selectedHero].name;
   }
   if (es) {
-    // keep badge
+    // Clear any lingering death/hurt animation so enemy is visible immediately
+    es.classList.remove('enemy-dead', 'enemy-hurt');
+    es.style.animation = 'none';
+    es.offsetHeight; // reflow to flush animation
+    es.style.animation = '';
+    es.style.opacity = '1';
+    es.style.transform = '';
+
     es.innerHTML = getEnemySVG(G.level);
     var b = document.createElement('span');
     b.className = 'enemy-level-badge'; b.id = 'enemy-badge';
     b.textContent = 'LVL ' + G.level;
     es.appendChild(b);
+
+    // Show enemy name in badge
+    var enb = $('enemy-name-badge');
+    if (enb && ENEMIES[G.level]) enb.textContent = ENEMIES[G.level].name;
   }
+  setLevelBackground(G.level);
   // reset enemy HP
   G.enemyHP = 5; G.enemyMaxHP = 5;
   updateEnemyHP();
@@ -1082,6 +1299,14 @@ function levelWin() {
   var ws = $('win-score'), wl = $('win-level');
   if (ws) ws.textContent = G.score;
   if (wl) wl.textContent = G.level;
+  // Enemy defeat message with player name
+  var msg = $('win-enemy-msg');
+  if (msg) {
+    var en = ENEMIES[G.level];
+    msg.textContent = en && en.msg
+      ? en.msg.replace(/\{name\}/g, G.playerName || 'Held')
+      : '';
+  }
   showScreen('screen-level-complete');
 }
 
@@ -1090,10 +1315,21 @@ function nextLevel() {
   G.taskIdx = 0;
   if (G.level > 10) {
     victory();
+  } else if (G.level === 10) {
+    showBossTaunt();
   } else {
     generateTasks(); updateHUD(); updateSprites();
     showScreen('screen-game'); showTask();
   }
+}
+
+function showBossTaunt() {
+  var sprite = $('boss-taunt-sprite');
+  if (sprite) sprite.innerHTML = getEnemySVG(10);
+  var text = $('boss-taunt-text');
+  var name = G.playerName || 'Held';
+  if (text) text.textContent = 'Hallo ' + name + '... du dachtest, du kannst mich besiegen? Dein Weg endet HIER! 🔮';
+  showScreen('screen-boss-taunt');
 }
 
 function gameOver() {
@@ -1392,6 +1628,13 @@ function initGame() {
   // --- Level complete ---
   $('btn-next-level').addEventListener('click', nextLevel);
 
+  // --- Boss taunt screen ---
+  $('btn-boss-accept').addEventListener('click', function() {
+    SoundSystem.playClick();
+    generateTasks(); updateHUD(); updateSprites();
+    showScreen('screen-game'); showTask();
+  });
+
   // --- Timeout ---
   $('btn-retry-timeout').addEventListener('click', retryFromTimeout);
 
@@ -1444,5 +1687,38 @@ function initGame() {
   document.head.appendChild(style);
 })();
 
-document.addEventListener('DOMContentLoaded', initGame);
-if (document.readyState === 'complete' || document.readyState === 'interactive') initGame();
+// Auto-start menu music as early as possible.
+// Most browsers block audio until user gesture; we attempt eagerly and fall back.
+function _tryAutoMusic() {
+  if (SoundSystem._menuMusicStarted) return;
+  SoundSystem._menuMusicStarted = true;
+  Tone.start().then(function() {
+    SoundSystem.startMenuMusic();
+  }).catch(function(){});
+}
+
+// First-interaction fallback: fires once on any click/key/touch
+(function() {
+  function onFirstInteraction() {
+    _tryAutoMusic();
+    document.removeEventListener('click', onFirstInteraction, true);
+    document.removeEventListener('keydown', onFirstInteraction, true);
+    document.removeEventListener('touchstart', onFirstInteraction, true);
+  }
+  document.addEventListener('click', onFirstInteraction, true);
+  document.addEventListener('keydown', onFirstInteraction, true);
+  document.addEventListener('touchstart', onFirstInteraction, true);
+})();
+
+var _gameInitialized = false;
+function _initOnce() {
+  if (_gameInitialized) return;
+  _gameInitialized = true;
+  initGame();
+  _tryAutoMusic();
+}
+
+document.addEventListener('DOMContentLoaded', _initOnce);
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  _initOnce();
+}

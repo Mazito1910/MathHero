@@ -651,3 +651,93 @@ body::before {
   margin-bottom: .6rem;
   letter-spacing: .5px;
 }
+
+/* =========================================================
+   ENEMY DEFEAT MESSAGE (level-complete screen)
+   ========================================================= */
+.enemy-defeat-msg {
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-style: italic;
+  color: rgba(255,255,255,.75);
+  background: rgba(255,255,255,.08);
+  border-left: 3px solid rgba(255,215,0,.5);
+  border-radius: 8px;
+  padding: .5rem 1rem;
+  margin: .2rem auto .4rem;
+  max-width: 340px;
+  min-height: 1.4em;
+  text-align: center;
+  letter-spacing: .2px;
+}
+
+/* =========================================================
+   BOSS TAUNT SCREEN
+   ========================================================= */
+.boss-taunt-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2rem;
+  animation: bossFadeIn .6s ease both;
+}
+@keyframes bossFadeIn {
+  from { opacity: 0; transform: scale(.85) translateY(20px); }
+  to   { opacity: 1; transform: scale(1)   translateY(0); }
+}
+
+.boss-taunt-sprite {
+  width: 140px;
+  height: 168px;
+  filter: drop-shadow(0 0 22px rgba(180,0,255,.65));
+  animation: bossFloat 2.4s ease-in-out infinite alternate;
+}
+.boss-taunt-sprite svg {
+  width: 100%; height: 100%;
+}
+@keyframes bossFloat {
+  from { transform: translateY(-6px) rotate(-1.5deg); }
+  to   { transform: translateY(6px)  rotate(1.5deg); }
+}
+
+/* Speech bubble — points upward to the boss */
+.boss-speech-bubble {
+  position: relative;
+  background: rgba(30,0,50,.9);
+  border: 2px solid rgba(180,0,255,.55);
+  border-radius: 18px;
+  padding: .9rem 1.4rem;
+  max-width: 320px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #e0aaff;
+  text-align: center;
+  line-height: 1.45;
+  letter-spacing: .3px;
+  box-shadow: 0 0 28px rgba(180,0,255,.3);
+}
+.boss-speech-bubble::before {
+  content: '';
+  position: absolute;
+  top: -16px; left: 50%;
+  transform: translateX(-50%);
+  border: 8px solid transparent;
+  border-bottom-color: rgba(180,0,255,.55);
+}
+.boss-speech-bubble::after {
+  content: '';
+  position: absolute;
+  top: -12px; left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-bottom-color: rgba(30,0,50,.9);
+}
+
+/* Boss-accept button — pulses red to signal high stakes */
+#btn-boss-accept {
+  animation: pulseRed 1.6s ease-in-out infinite alternate;
+}
+@keyframes pulseRed {
+  from { box-shadow: 0 0 12px rgba(220,50,50,.35); }
+  to   { box-shadow: 0 0 30px rgba(220,50,50,.85); }
+}
