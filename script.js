@@ -1268,6 +1268,10 @@ function startTimer() {
     G._musicLevel = G.level;
     SoundSystem.startLevelMusic(G.level);
   }
+
+  // Gegner-Position immer zurücksetzen (kein Einfrieren zwischen Aufgaben)
+  _resetEnemyPosition();
+
   if (G.trainingMode) {
     var fill = $('time-fill'), txt = $('time-text');
     if (fill) { fill.style.width = '100%'; fill.style.background = '#4CAF50'; }
@@ -1286,6 +1290,9 @@ function startTimer() {
     var pct = p * 100;
     updateTimeBar(p);
 
+    // Gegner bewegt sich auf den Spieler zu (nur Normal-Modus)
+    _updateEnemyAdvance(p);
+
     if (pct <= 25 && pct > 12) {
       SoundSystem.setTempo(1.4);
       if (Date.now() - SoundSystem.lastWarningTime > 600) { SoundSystem.playTimeWarning(); SoundSystem.lastWarningTime = Date.now(); }
@@ -1300,6 +1307,30 @@ function startTimer() {
   }, TICK);
 }
 
+// Gegner-Position basierend auf verbleibender Zeit aktualisieren
+function _updateEnemyAdvance(progress) {
+  var es = $('enemy-sprite');
+  if (!es) return;
+  // progress = 1 (volle Zeit) → 0 (Zeit abgelaufen)
+  // Gegner fängt weit rechts an und rückt nach links vor
+  var maxShift = 110; // px Richtung Spieler
+  var shift = (1 - progress) * maxShift;
+  es.style.transform = 'translateX(-' + shift.toFixed(1) + 'px)';
+}
+
+// Gegner zurück auf Ausgangsposition
+function _resetEnemyPosition() {
+  var es = $('enemy-sprite');
+  if (es) {
+    es.style.transition = 'transform 0.3s ease';
+    es.style.transform = 'translateX(0)';
+    // Transition nach Reset entfernen damit spätere Timer-Updates ohne Lag wirken
+    setTimeout(function() {
+      if (es) es.style.transition = '';
+    }, 320);
+  }
+}
+
 function stopTimer() {
   clearInterval(G.timer);
   SoundSystem.stopMusic();
@@ -1311,14 +1342,29 @@ function stopTimer() {
 // =====================================================================
 function timeUp() {
   if (G.trainingMode) return;
+
+  // Gegner-Angriffs-Animation: kurzer Einschlag auf den Spieler, dann zurück
+  var es = $('enemy-sprite');
+  if (es) {
+    es.style.transition = 'transform 0.15s ease-out';
+    es.style.transform = 'translateX(-160px) scale(1.15)'; // Angriff!
+    flash('rgba(255,0,0,0.45)');
+    setTimeout(function() {
+      if (es) {
+        es.style.transition = 'transform 0.25s ease-in';
+        es.style.transform = 'translateX(0)';
+        setTimeout(function() { if (es) es.style.transition = ''; }, 260);
+      }
+    }, 200);
+  }
+
   G.lives--;
   SoundSystem.playLifeLost();
-  flash('rgba(255,0,0,0.35)');
   updateHUD();
   if (G.lives <= 0) {
-    setTimeout(function() { stopTimer(); gameOver(); }, 400);
+    setTimeout(function() { stopTimer(); gameOver(); }, 600);
   } else {
-    showScreen('screen-timeout');
+    setTimeout(function() { showScreen('screen-timeout'); }, 500);
   }
 }
 
@@ -1347,6 +1393,211 @@ function showTask() {
 function setLevelBackground(level) {
   var arena = document.querySelector('.battle-arena');
   if (arena && LEVEL_BG[level]) arena.style.background = LEVEL_BG[level];
+  var deco = $('level-bg-deco');
+  if (deco) deco.innerHTML = getLevelBgDeco(level);
+}
+
+// ── Hintergrundgrafiken je Level ────────────────────────────────────────────
+function getLevelBgDeco(level) {
+  // Helfer: einfaches HTML-Tag mit Stil bauen
+  function el(cls, style, inner) {
+    return '<div class="' + cls + '" style="' + style + '">' + (inner || '') + '</div>';
+  }
+  // Wolken-Generator
+  function clouds(n, opacity) {
+    var h = '';
+    for (var i = 0; i < n; i++) {
+      var w = 70 + i * 30, ht = 28 + i * 8;
+      var top = 8 + i * 14;
+      var dur = 18 + i * 7;
+      var delay = -(i * 6);
+      h += '<div class="deco-cloud" style="width:' + w + 'px;height:' + ht + 'px;top:' + top + '%;'
+         + 'animation-duration:' + dur + 's;animation-delay:' + delay + 's;opacity:' + (opacity||.8) + '">'
+         + '<div style="position:absolute;width:' + Math.round(w*.55) + 'px;height:' + Math.round(ht*1.4) + 'px;'
+         + 'background:white;border-radius:50%;top:-50%;left:20%"></div>'
+         + '<div style="position:absolute;width:' + Math.round(w*.4) + 'px;height:' + Math.round(ht*1.3) + 'px;'
+         + 'background:white;border-radius:50%;top:-40%;left:50%"></div>'
+         + '</div>';
+    }
+    return h;
+  }
+  // Sterne-Generator
+  function stars(n, color, minSize, maxSize) {
+    var h = '';
+    for (var i = 0; i < n; i++) {
+      var sz = minSize + Math.random() * (maxSize - minSize) | 0;
+      var dur = 1.5 + Math.random() * 2.5;
+      var delay = -(Math.random() * dur);
+      h += '<div class="deco-star" style="width:' + sz + 'px;height:' + sz + 'px;'
+         + 'left:' + (Math.random() * 95) + '%;top:' + (Math.random() * 60) + '%;'
+         + 'background:' + (color || 'white') + ';'
+         + 'animation-duration:' + dur.toFixed(1) + 's;animation-delay:' + delay.toFixed(1) + 's"></div>';
+    }
+    return h;
+  }
+  // Glühaugen-Generator
+  function eyes(n, color) {
+    var h = '';
+    for (var i = 0; i < n; i++) {
+      h += '<div class="deco-eye" style="left:' + (5 + Math.random() * 85) + '%;'
+         + 'top:' + (20 + Math.random() * 55) + '%;'
+         + 'animation-duration:' + (2 + Math.random() * 3).toFixed(1) + 's;'
+         + 'animation-delay:' + -(Math.random() * 3).toFixed(1) + 's">'
+         + '<span style="background:' + (color||'#b388ff') + ';box-shadow:0 0 8px 3px ' + (color||'#b388ff') + '"></span>'
+         + '<span style="background:' + (color||'#b388ff') + ';box-shadow:0 0 8px 3px ' + (color||'#b388ff') + '"></span>'
+         + '</div>';
+    }
+    return h;
+  }
+
+  if (level === 1) {
+    // Blauer Himmel: Sonne + 3 Wolken
+    return el('deco-sun','width:60px;height:60px;top:8%;right:12%;background:#FFD600;')
+      + clouds(3, 0.9);
+  }
+  if (level === 2) {
+    // Sonnige Wiese: Wolken + Hügel + Sonne
+    var hills = el('deco-hill','width:220px;height:100px;left:-30px;background:#66bb6a;opacity:.55')
+              + el('deco-hill','width:180px;height:80px;right:-20px;background:#81c784;opacity:.5');
+    return el('deco-sun','width:52px;height:52px;top:10%;left:10%;background:#FFF176;')
+      + clouds(2, 0.85) + hills;
+  }
+  if (level === 3) {
+    // Herbst-Dämmerung: fallende Blätter + Baumsilhouette
+    var lc = ['#e65100','#bf360c','#f57f17','#6d4c41','#dd2c00'];
+    var leaves = '';
+    for (var i = 0; i < 8; i++) {
+      leaves += '<div class="deco-leaf" style="left:' + (i * 12 + 2) + '%;'
+        + 'background:' + lc[i % lc.length] + ';'
+        + 'animation-duration:' + (4 + i * .7) + 's;animation-delay:-' + (i * 1.1) + 's"></div>';
+    }
+    var treeSvg = '<svg viewBox="0 0 60 130" xmlns="http://www.w3.org/2000/svg" style="width:60px;height:130px">'
+      + '<rect x="27" y="80" width="6" height="50" fill="#4e342e"/>'
+      + '<line x1="30" y1="100" x2="10" y2="80" stroke="#4e342e" stroke-width="3"/>'
+      + '<line x1="30" y1="90" x2="50" y2="70" stroke="#4e342e" stroke-width="3"/>'
+      + '<line x1="30" y1="80" x2="15" y2="60" stroke="#4e342e" stroke-width="2"/>'
+      + '<line x1="30" y1="70" x2="48" y2="50" stroke="#4e342e" stroke-width="2"/>'
+      + '<line x1="30" y1="60" x2="22" y2="40" stroke="#4e342e" stroke-width="2"/>'
+      + '<line x1="30" y1="50" x2="38" y2="30" stroke="#4e342e" stroke-width="2"/>'
+      + '</svg>';
+    return leaves
+      + el('deco-tree','left:2%;bottom:0;opacity:.7', treeSvg)
+      + el('deco-tree','right:3%;bottom:0;opacity:.6;transform:scaleX(-1)', treeSvg);
+  }
+  if (level === 4) {
+    // Abenddämmerung: Mond + viele Sterne
+    var moon = el('deco-moon','width:50px;height:50px;top:8%;right:14%;'
+      + 'background:radial-gradient(circle at 35% 35%,#fff9c4,#f9a825);');
+    return moon + stars(28, 'white', 2, 4);
+  }
+  if (level === 5) {
+    // Dunkler Wald: Baumsilhouetten + Nebel + Augen
+    var pine = '<svg viewBox="0 0 70 160" xmlns="http://www.w3.org/2000/svg" style="width:70px;height:160px">'
+      + '<rect x="31" y="110" width="8" height="50" fill="#1b5e20"/>'
+      + '<polygon points="35,0 5,60 65,60" fill="#1b5e20"/>'
+      + '<polygon points="35,25 5,90 65,90" fill="#1b5e20"/>'
+      + '<polygon points="35,55 5,120 65,120" fill="#1b5e20"/>'
+      + '</svg>';
+    return el('deco-tree','left:-5px;bottom:0;opacity:.9', pine)
+      + el('deco-tree','left:35px;bottom:0;opacity:.7;animation-delay:-2s', pine)
+      + el('deco-tree','right:-5px;bottom:0;opacity:.85;transform:scaleX(-1)', pine)
+      + el('deco-tree','right:35px;bottom:0;opacity:.6;transform:scaleX(-1);animation-delay:-3s', pine)
+      + el('deco-fog','width:200px;height:60px;bottom:10%;left:-10%;background:rgba(144,164,174,.3)')
+      + el('deco-fog','width:160px;height:50px;bottom:8%;right:5%;background:rgba(144,164,174,.25);animation-delay:-2s')
+      + eyes(3, '#76ff03');
+  }
+  if (level === 6) {
+    // Sturmnacht: Wolken + Blitz + Sterne
+    var stormCloud = el('','position:absolute;width:130px;height:40px;border-radius:40px;'
+      + 'background:rgba(30,30,60,.8);top:10%;left:15%')
+      + el('','position:absolute;width:100px;height:35px;border-radius:40px;'
+      + 'background:rgba(20,20,50,.8);top:18%;right:10%');
+    var bolt = '<svg viewBox="0 0 30 70" xmlns="http://www.w3.org/2000/svg" style="width:30px;height:70px">'
+      + '<polygon points="18,0 8,38 16,38 10,70 26,28 17,28 24,0" fill="#FFF59D" opacity=".95"/></svg>';
+    return stormCloud
+      + el('deco-lightning','top:10%;left:38%', bolt)
+      + el('deco-lightning','top:8%;right:25%;animation-delay:-3.5s', bolt)
+      + stars(8, 'rgba(255,255,255,.5)', 2, 3);
+  }
+  if (level === 7) {
+    // Vulkan-Glut: Flammen + Glut + Embers
+    var flameSvg = '<svg viewBox="0 0 40 80" xmlns="http://www.w3.org/2000/svg" style="width:40px;height:80px">'
+      + '<path d="M20 75 Q5 55 10 35 Q14 20 8 5 Q22 22 18 38 Q25 25 30 10 Q38 30 32 50 Q35 60 20 75Z" fill="#ff6d00"/>'
+      + '<path d="M20 75 Q10 58 14 42 Q18 30 14 18 Q24 30 20 45 Q26 35 28 22 Q34 38 28 54 Q26 65 20 75Z" fill="#ffd600"/>'
+      + '</svg>';
+    var embers = '';
+    for (var i = 0; i < 10; i++) {
+      embers += '<div class="deco-ember" style="left:' + (10 + Math.random() * 80) + '%;'
+        + 'bottom:' + (5 + Math.random() * 20) + '%;'
+        + 'background:' + (i%2===0?'#ff6d00':'#ffd600') + ';'
+        + '--dx:' + (Math.random()*40-20).toFixed(0) + 'px;'
+        + 'animation-duration:' + (1.5+Math.random()*2).toFixed(1) + 's;'
+        + 'animation-delay:-' + (Math.random()*2).toFixed(1) + 's"></div>';
+    }
+    return el('deco-tree','left:0;bottom:0;opacity:.9', flameSvg)
+      + el('deco-tree','right:5px;bottom:0;opacity:.85;animation-delay:-1.2s', flameSvg)
+      + el('deco-lava','') + embers;
+  }
+  if (level === 8) {
+    // Gewittersturm: Regen + Blitze + dunkle Wolken
+    var rain = '';
+    for (var i = 0; i < 20; i++) {
+      rain += '<div class="deco-rain" style="left:' + (i * 5 + Math.random() * 4) + '%;'
+        + 'height:' + (18 + Math.random() * 20) + 'px;'
+        + 'animation-duration:' + (.5 + Math.random() * .4).toFixed(2) + 's;'
+        + 'animation-delay:-' + (Math.random() * .8).toFixed(2) + 's;opacity:.6"></div>';
+    }
+    var bolt2 = '<svg viewBox="0 0 30 80" xmlns="http://www.w3.org/2000/svg" style="width:30px;height:80px">'
+      + '<polygon points="20,0 8,44 17,44 8,80 28,32 18,32 26,0" fill="white" opacity=".9"/></svg>';
+    return el('','position:absolute;width:100%;height:45px;top:0;background:rgba(13,13,40,.7);border-radius:0 0 40% 40%')
+      + rain
+      + el('deco-lightning','top:5%;left:28%',bolt2)
+      + el('deco-lightning','top:3%;right:20%;animation-delay:-2.8s',bolt2);
+  }
+  if (level === 9) {
+    // Unterwelt: Augen + Nebel + Runen-Symbole
+    var runes = ['ᚠ','ᚢ','ᚦ','ᚨ','ᚱ','ᚲ'];
+    var runeHtml = '';
+    for (var i = 0; i < 5; i++) {
+      runeHtml += '<div style="position:absolute;font-size:' + (14+i*4) + 'px;'
+        + 'color:rgba(180,0,255,' + (.2+Math.random()*.35).toFixed(2) + ');'
+        + 'left:' + (5+Math.random()*85) + '%;top:' + (15+Math.random()*55) + '%;'
+        + 'animation:starTwinkle ' + (2+Math.random()*3).toFixed(1) + 's ease-in-out infinite alternate;'
+        + 'animation-delay:-' + (Math.random()*3).toFixed(1) + 's;font-family:serif">'
+        + runes[i] + '</div>';
+    }
+    return el('deco-wisp','width:100px;height:60px;left:5%;top:30%;background:rgba(138,43,226,.35)')
+      + el('deco-wisp','width:80px;height:50px;right:8%;top:25%;background:rgba(75,0,130,.4);animation-delay:-1.5s')
+      + el('deco-fog','width:100%;height:50px;bottom:0;left:0;background:rgba(74,0,114,.4)')
+      + eyes(5, '#ce93d8')
+      + runeHtml;
+  }
+  if (level === 10) {
+    // Chaos: Alles auf einmal — Embers + Wisps + Augen + Blitz + Chaos-Orbs
+    var chOrbs = '';
+    var orbColors = ['#e040fb','#ff1744','#ff6d00','#b388ff','#ffd600'];
+    for (var i = 0; i < 5; i++) {
+      chOrbs += el('deco-chaos','width:' + (60+i*20) + 'px;height:' + (60+i*20) + 'px;'
+        + 'left:' + (i*18+5) + '%;top:' + (10+i*8) + '%;'
+        + 'background:' + orbColors[i] + ';opacity:.25;'
+        + 'animation-duration:' + (2+i*.8).toFixed(1) + 's;animation-delay:-' + (i*.7).toFixed(1) + 's');
+    }
+    var chBolt = '<svg viewBox="0 0 30 80" xmlns="http://www.w3.org/2000/svg" style="width:25px;height:65px">'
+      + '<polygon points="18,0 7,40 15,40 7,80 26,30 17,30 24,0" fill="#e040fb" opacity=".95"/></svg>';
+    var chEmbers = '';
+    for (var i = 0; i < 8; i++) {
+      chEmbers += '<div class="deco-ember" style="left:' + (5+Math.random()*90) + '%;bottom:10%;'
+        + 'background:' + orbColors[i%orbColors.length] + ';'
+        + '--dx:' + (Math.random()*50-25).toFixed(0) + 'px;'
+        + 'animation-duration:' + (1+Math.random()*1.5).toFixed(1) + 's;'
+        + 'animation-delay:-' + (Math.random()*2).toFixed(1) + 's;width:6px;height:6px"></div>';
+    }
+    return chOrbs + chEmbers
+      + el('deco-lightning','top:5%;left:20%',chBolt)
+      + el('deco-lightning','top:8%;right:15%;animation-delay:-1.8s',chBolt)
+      + eyes(4, '#ea80fc');
+  }
+  return '';
 }
 
 function updateSprites() {
@@ -1393,6 +1644,7 @@ function checkAnswer() {
 function correctAns() {
   clearInterval(G.timer);      // stop countdown only — music keeps running
   SoundSystem.setTempo(1);     // reset any time-warning tempo boost
+  _resetEnemyPosition();       // Gegner zurück an seinen Platz
   SoundSystem.playCorrect();
   var inp = $('answer-input');
   if (inp) inp.className = 'correct';
@@ -1839,6 +2091,14 @@ function initGame() {
 
   // --- Level complete ---
   $('btn-next-level').addEventListener('click', nextLevel);
+
+  // Enter-Taste bestätigt "WEITER" auf dem Level-Complete-Screen
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Enter') return;
+    var active = document.querySelector('.screen.active');
+    if (active && active.id === 'screen-level-complete') nextLevel();
+    if (active && active.id === 'screen-boss-taunt') $('btn-boss-accept').click();
+  });
 
   // --- Boss taunt screen ---
   $('btn-boss-accept').addEventListener('click', function() {

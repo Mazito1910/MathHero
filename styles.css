@@ -231,6 +231,190 @@ body::before {
   gap: 0.7rem;
   padding: 0.4rem 2rem 1.2rem;
   overflow: hidden;
+  transition: background 1.2s ease;
+}
+
+/* ── Level-Hintergrund-Dekorationen ──────────────────────────── */
+#level-bg-deco {
+  position: absolute; inset: 0;
+  pointer-events: none; overflow: hidden;
+  z-index: 0;
+}
+/* Clouds */
+.deco-cloud {
+  position: absolute;
+  background: white;
+  border-radius: 50px;
+  opacity: .85;
+  animation: cloudDrift linear infinite;
+}
+.deco-cloud::before, .deco-cloud::after {
+  content:''; position:absolute; background:white; border-radius:50%;
+}
+@keyframes cloudDrift {
+  from { transform: translateX(-160px); }
+  to   { transform: translateX(calc(100vw + 160px)); }
+}
+/* Sun */
+.deco-sun {
+  position: absolute;
+  border-radius: 50%;
+  animation: sunPulse 4s ease-in-out infinite alternate;
+}
+@keyframes sunPulse {
+  from { box-shadow: 0 0 30px 10px rgba(255,235,59,.5); }
+  to   { box-shadow: 0 0 55px 20px rgba(255,235,59,.8); }
+}
+/* Stars */
+.deco-star {
+  position: absolute;
+  background: white;
+  border-radius: 50%;
+  animation: starTwinkle ease-in-out infinite alternate;
+}
+@keyframes starTwinkle {
+  from { opacity: .2; transform: scale(.8); }
+  to   { opacity: 1;  transform: scale(1.2); }
+}
+/* Moon */
+.deco-moon {
+  position: absolute;
+  border-radius: 50%;
+  animation: moonGlow 5s ease-in-out infinite alternate;
+}
+@keyframes moonGlow {
+  from { box-shadow: 0 0 18px 4px rgba(255,255,200,.35); }
+  to   { box-shadow: 0 0 36px 10px rgba(255,255,200,.65); }
+}
+/* Falling leaves */
+.deco-leaf {
+  position: absolute;
+  top: -40px;
+  width: 14px; height: 10px;
+  border-radius: 50% 0 50% 0;
+  animation: leafFall linear infinite;
+}
+@keyframes leafFall {
+  0%   { transform: translateX(0) rotate(0deg);   opacity: 1; }
+  80%  { opacity: .8; }
+  100% { transform: translateX(60px) rotate(540deg) translateY(110vh); opacity: 0; }
+}
+/* Trees */
+.deco-tree {
+  position: absolute;
+  bottom: 0;
+  animation: treeSway 6s ease-in-out infinite alternate;
+  transform-origin: bottom center;
+}
+@keyframes treeSway {
+  from { transform: rotate(-1.5deg); }
+  to   { transform: rotate(1.5deg); }
+}
+/* Fog wisps */
+.deco-fog {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(18px);
+  animation: fogDrift ease-in-out infinite alternate;
+}
+@keyframes fogDrift {
+  from { transform: translateX(-20px) scaleX(.95); opacity: .18; }
+  to   { transform: translateX(20px)  scaleX(1.05); opacity: .32; }
+}
+/* Embers / sparks */
+.deco-ember {
+  position: absolute;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  animation: emberRise linear infinite;
+}
+@keyframes emberRise {
+  0%   { opacity: 1; transform: translateX(0) translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateX(var(--dx,20px)) translateY(-120px) scale(.2); }
+}
+/* Rain */
+.deco-rain {
+  position: absolute;
+  top: -20px;
+  width: 1.5px;
+  background: linear-gradient(to bottom, transparent, rgba(180,210,255,.7));
+  animation: rainFall linear infinite;
+  border-radius: 2px;
+}
+@keyframes rainFall {
+  from { transform: translateY(0) skewX(-15deg); opacity:.7; }
+  to   { transform: translateY(110vh) skewX(-15deg); opacity:.3; }
+}
+/* Lightning flash */
+.deco-lightning {
+  position: absolute;
+  animation: lightningFlash ease-in-out infinite;
+  opacity: 0;
+}
+@keyframes lightningFlash {
+  0%,89%   { opacity: 0; }
+  90%      { opacity: 1; }
+  92%      { opacity: 0; }
+  94%      { opacity: .8; }
+  96%,100% { opacity: 0; }
+}
+/* Glowing eyes */
+.deco-eye {
+  position: absolute;
+  display: flex; gap: 6px;
+  animation: eyeBlink ease-in-out infinite;
+}
+.deco-eye span {
+  display: block;
+  width: 9px; height: 6px;
+  border-radius: 50%;
+  background: #b388ff;
+  box-shadow: 0 0 8px 3px #b388ff;
+  filter: blur(.5px);
+}
+@keyframes eyeBlink {
+  0%,48%,52%,100% { opacity: .85; }
+  50%             { opacity: 0; }
+}
+/* Floating wisps */
+.deco-wisp {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(10px);
+  animation: wispFloat ease-in-out infinite alternate;
+}
+@keyframes wispFloat {
+  from { transform: translateY(-10px) translateX(-8px) scale(.9); opacity:.5; }
+  to   { transform: translateY(10px)  translateX(8px)  scale(1.1); opacity:.9; }
+}
+/* Hills */
+.deco-hill {
+  position: absolute; bottom: 0;
+  border-radius: 50%;
+}
+/* Lava glow */
+.deco-lava {
+  position: absolute; bottom: 0;
+  width: 100%; height: 30px;
+  background: linear-gradient(to top, #ff3d00, transparent);
+  animation: lavaGlow 2s ease-in-out infinite alternate;
+  filter: blur(4px);
+}
+@keyframes lavaGlow {
+  from { opacity: .5; }
+  to   { opacity: 1; }
+}
+/* Chaos energy */
+.deco-chaos {
+  position: absolute;
+  border-radius: 50%;
+  mix-blend-mode: screen;
+  filter: blur(24px);
+  animation: chaosPulse ease-in-out infinite alternate;
+}
+@keyframes chaosPulse {
+  from { transform: scale(.8) rotate(0deg);   opacity: .3; }
+  to   { transform: scale(1.2) rotate(180deg); opacity: .7; }
 }
 
 /* VISUAL TIMER LAYER */
