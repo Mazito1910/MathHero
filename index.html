@@ -167,6 +167,15 @@
   <section id="screen-highscore" class="screen">
     <h2>🏆 HIGHSCORE LISTE</h2>
     <div class="hs-gameover-banner" id="hs-gameover-banner" style="display:none"></div>
+
+    <!-- Zeitraum-Filter -->
+    <div class="hs-filter-bar">
+      <button class="hs-filter-btn active" data-filter="all">🌍 Gesamt</button>
+      <button class="hs-filter-btn" data-filter="today">📅 Heute</button>
+      <button class="hs-filter-btn" data-filter="month">🗓 Monat</button>
+    </div>
+    <div class="hs-source-badge" id="hs-source-badge"></div>
+
     <div class="highscore-list" id="highscore-list"></div>
     <div style="display:flex;gap:.8rem;flex-wrap:wrap;justify-content:center;">
       <button class="btn btn-primary" id="btn-hs-retry" style="display:none">↺ NOCHMAL</button>
@@ -177,6 +186,7 @@
 
 </div><!-- /game-container -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="script.js"></script>
 </body>
 </html>

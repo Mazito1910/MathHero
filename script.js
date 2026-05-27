@@ -412,6 +412,113 @@ var CHARACTERS = [
   { name: 'Fuchs-Ranger', color: '#388e3c' }
 ];
 
+// =====================================================================
+// SUPABASE — globale Highscore-Datenbank mit localStorage-Fallback
+// =====================================================================
+var SupabaseDB = {
+  _url: 'https://budsuvkaiczmlbxqvfip.supabase.co',
+  _key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ1ZHN1dmthaWN6bWxieHF2ZmlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MzY4NTUsImV4cCI6MjA5NTQxMjg1NX0.Ienlvt7Yn-y-vd9i2H1rTYE_85bBW1CfGIBo_sD1-n8',
+  _client: null,
+
+  // Supabase-Client einmalig erzeugen
+  init: function() {
+    if (this._client) return;
+    if (window.supabase && window.supabase.createClient) {
+      this._client = window.supabase.createClient(this._url, this._key);
+    }
+  },
+
+  // True wenn Browser online UND SDK geladen
+  isOnline: function() {
+    return navigator.onLine && this._client !== null;
+  },
+
+  // Score in Supabase speichern; bei Fehler → Pending-Queue
+  saveScore: async function(entry) {
+    this.init();
+    var row = {
+      player_name:   entry.name,
+      score:         entry.score,
+      level_reached: entry.level,
+      hero_index:    entry.hero
+    };
+    if (!this.isOnline()) {
+      this._addPending(row); return false;
+    }
+    try {
+      var res = await this._client.from('highscores').insert(row);
+      if (res.error) { this._addPending(row); return false; }
+      return true;
+    } catch(e) {
+      this._addPending(row); return false;
+    }
+  },
+
+  // Top-20 Scores aus Supabase laden; null = offline → Fallback auf localStorage
+  loadScores: async function(filter) {
+    this.init();
+    if (!this.isOnline()) return null;
+    try {
+      var q = this._client
+        .from('highscores')
+        .select('player_name, score, level_reached, hero_index, created_at')
+        .order('score', { ascending: false })
+        .limit(20);
+
+      if (filter === 'today') {
+        var t = new Date(); t.setHours(0,0,0,0);
+        q = q.gte('created_at', t.toISOString());
+      } else if (filter === 'month') {
+        var m = new Date(); m.setDate(1); m.setHours(0,0,0,0);
+        q = q.gte('created_at', m.toISOString());
+      }
+
+      var res = await q;
+      if (res.error) return null;
+      // Supabase-Format → internes Format angleichen
+      return (res.data || []).map(function(r) {
+        return {
+          name:  r.player_name,
+          score: r.score,
+          level: r.level_reached,
+          hero:  r.hero_index,
+          date:  new Date(r.created_at).toLocaleDateString('de-DE')
+        };
+      });
+    } catch(e) {
+      return null;
+    }
+  },
+
+  // Offline-gespeicherte Scores hochladen sobald wieder online
+  syncPending: async function() {
+    this.init();
+    if (!this.isOnline()) return;
+    var pending = this._getPending();
+    if (!pending.length) return;
+    try {
+      var res = await this._client.from('highscores').insert(pending);
+      if (!res.error) {
+        localStorage.removeItem('mathHeroPending');
+        console.log('[SupabaseDB] ' + pending.length + ' pending score(s) synced.');
+      }
+    } catch(e) {}
+  },
+
+  _addPending: function(row) {
+    var list = this._getPending();
+    list.push(row);
+    localStorage.setItem('mathHeroPending', JSON.stringify(list));
+  },
+  _getPending: function() {
+    try { return JSON.parse(localStorage.getItem('mathHeroPending')) || []; }
+    catch(e) { return []; }
+  }
+};
+
+// Pending-Sync auslösen wenn Browser wieder online kommt
+window.addEventListener('online', function() { SupabaseDB.syncPending(); });
+
 // One enemy per level (10 total), name + defeat message ({name} = player name)
 var ENEMIES = [
   null,
@@ -1365,38 +1472,54 @@ function victory() {
 // HIGHSCORE  (auto-save, hero stored)
 // =====================================================================
 function autoSaveScore() {
-  var scores = loadScores();
   var entry = {
-    name: G.playerName || 'Held',
-    hero: G.selectedHero !== null ? G.selectedHero : 0,
+    name:  G.playerName || 'Held',
+    hero:  G.selectedHero !== null ? G.selectedHero : 0,
     score: G.score,
     level: G.level,
-    date: new Date().toLocaleDateString('de-DE')
+    date:  new Date().toLocaleDateString('de-DE')
   };
-  scores.push(entry);
-  scores.sort(function(a, b) { return b.score - a.score; });
-  scores = scores.slice(0, 10);
-  localStorage.setItem('mathHeroScores', JSON.stringify(scores));
+
+  // Immer lokal speichern (Fallback + Offline-Nutzung)
+  var local = loadLocalScores();
+  local.push(entry);
+  local.sort(function(a, b) { return b.score - a.score; });
+  local = local.slice(0, 20);
+  localStorage.setItem('mathHeroScores', JSON.stringify(local));
+
+  // Zusätzlich in Supabase speichern (async, im Hintergrund)
+  SupabaseDB.saveScore(entry);
 }
 
-function loadScores() {
+// Nur lokale Scores (localStorage)
+function loadLocalScores() {
   try { return JSON.parse(localStorage.getItem('mathHeroScores')) || []; }
   catch (e) { return []; }
 }
 
+// Aktuell aktiver Zeitfilter im Highscore-Screen
+var _hsFilter = 'all';
+// Optionen merken (z.B. highlightScore nach Game Over)
+var _hsOpts   = {};
+
 function showHighscores(opts) {
-  opts = opts || {};
-  var list   = $('highscore-list');
+  _hsOpts = opts || {};
+  _hsFilter = 'all';
+  _applyHsFilterButtons();
+  _renderHsHeader();
+  showScreen('screen-highscore');
+  _loadAndRenderScores();
+}
+
+// Header / Banner je nach Kontext (Game Over vs. normaler Aufruf)
+function _renderHsHeader() {
   var banner = $('hs-gameover-banner');
   var retry  = $('btn-hs-retry');
   var title  = document.querySelector('#screen-highscore h2');
-  if (!list) return;
-
-  // Banner & title
-  if (opts.isGameOver) {
+  if (_hsOpts.isGameOver) {
     if (title)  title.innerHTML = '💀 GAME OVER &nbsp;·&nbsp; 🏆 HIGHSCORE';
     if (banner) {
-      banner.innerHTML = 'Level&nbsp;<strong>' + opts.gameOverLevel + '</strong>&nbsp;erreicht &nbsp;·&nbsp; ⭐&nbsp;<strong>' + opts.highlightScore + '</strong>&nbsp;Punkte';
+      banner.innerHTML = 'Level&nbsp;<strong>' + _hsOpts.gameOverLevel + '</strong>&nbsp;erreicht &nbsp;·&nbsp; ⭐&nbsp;<strong>' + _hsOpts.highlightScore + '</strong>&nbsp;Punkte';
       banner.style.display = 'block';
     }
     if (retry) retry.style.display = 'inline-flex';
@@ -1405,34 +1528,84 @@ function showHighscores(opts) {
     if (banner) banner.style.display = 'none';
     if (retry)  retry.style.display = 'none';
   }
+}
 
-  var scores = loadScores();
-  if (scores.length === 0) {
-    list.innerHTML = '<p class="hs-empty">Noch keine Highscores!</p>';
+// Scores laden (Supabase wenn online, sonst localStorage) und Tabelle rendern
+async function _loadAndRenderScores() {
+  var list  = $('highscore-list');
+  var badge = $('hs-source-badge');
+  if (!list) return;
+
+  list.innerHTML = '<p class="hs-loading">⏳ Lädt...</p>';
+
+  var scores = await SupabaseDB.loadScores(_hsFilter);
+  var isOnline = scores !== null;
+
+  if (!isOnline) {
+    // Offline: lokale Scores, bei Filter "today"/"month" selbst filtern
+    scores = _filterLocalScores(loadLocalScores(), _hsFilter);
+    if (badge) badge.textContent = '📴 Offline – lokale Scores';
   } else {
-    var medals = ['🥇', '🥈', '🥉'];
-    var highlighted = false;
-    var html = '<table class="score-table"><tr><th>#</th><th>Held</th><th>Name</th><th>Score</th><th>Level</th><th>Datum</th></tr>';
-    scores.forEach(function(s, i) {
-      var heroSVG = '<div style="width:36px;height:36px;display:inline-block;">' + getCharSVG(s.hero || 0) + '</div>';
-      // Highlight the first row that matches the just-earned score + name
-      var isNew = !highlighted && opts.highlightScore !== undefined
-                  && s.score === opts.highlightScore
-                  && s.name  === opts.highlightName;
-      if (isNew) highlighted = true;
-      html += '<tr' + (isNew ? ' class="hs-highlight"' : '') + '>';
-      html += '<td>' + (medals[i] || (i + 1)) + '</td>';
-      html += '<td>' + heroSVG + '</td>';
-      html += '<td>' + s.name + '</td>';
-      html += '<td>' + s.score + '</td>';
-      html += '<td>' + s.level + '</td>';
-      html += '<td>' + s.date + '</td>';
-      html += '</tr>';
-    });
-    html += '</table>';
-    list.innerHTML = html;
+    if (badge) badge.textContent = '🌐 Online – globale Rangliste';
   }
-  showScreen('screen-highscore');
+
+  _renderScoreTable(list, scores);
+}
+
+// Lokale Scores nach Zeitraum filtern
+function _filterLocalScores(scores, filter) {
+  if (filter === 'all') return scores;
+  var now = new Date();
+  return scores.filter(function(s) {
+    // Datum gespeichert als "TT.MM.JJJJ" (de-DE)
+    var parts = (s.date || '').split('.');
+    if (parts.length < 3) return false;
+    var d = new Date(+parts[2], +parts[1] - 1, +parts[0]);
+    if (filter === 'today') {
+      return d.toDateString() === now.toDateString();
+    }
+    if (filter === 'month') {
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }
+    return true;
+  });
+}
+
+// HTML-Tabelle aus Score-Array aufbauen
+function _renderScoreTable(list, scores) {
+  if (!scores || scores.length === 0) {
+    list.innerHTML = '<p class="hs-empty">Keine Scores für diesen Zeitraum!</p>';
+    return;
+  }
+  var medals = ['🥇', '🥈', '🥉'];
+  var highlighted = false;
+  var html = '<table class="score-table">'
+    + '<tr><th>#</th><th>Held</th><th>Name</th><th>Score</th><th>Level</th><th>Datum</th></tr>';
+  scores.forEach(function(s, i) {
+    var heroSVG = '<div style="width:36px;height:36px;display:inline-block;">' + getCharSVG(s.hero || 0) + '</div>';
+    var isNew = !highlighted
+      && _hsOpts.highlightScore !== undefined
+      && s.score === _hsOpts.highlightScore
+      && s.name  === _hsOpts.highlightName;
+    if (isNew) highlighted = true;
+    html += '<tr' + (isNew ? ' class="hs-highlight"' : '') + '>';
+    html += '<td>' + (medals[i] || (i + 1)) + '</td>';
+    html += '<td>' + heroSVG + '</td>';
+    html += '<td>' + (s.name || '?') + '</td>';
+    html += '<td>' + s.score + '</td>';
+    html += '<td>' + s.level + '</td>';
+    html += '<td>' + (s.date || '–') + '</td>';
+    html += '</tr>';
+  });
+  html += '</table>';
+  list.innerHTML = html;
+}
+
+// Aktiven Filter-Button visuell markieren
+function _applyHsFilterButtons() {
+  document.querySelectorAll('.hs-filter-btn').forEach(function(btn) {
+    btn.classList.toggle('active', btn.getAttribute('data-filter') === _hsFilter);
+  });
 }
 
 // =====================================================================
@@ -1672,6 +1845,15 @@ function initGame() {
       localStorage.removeItem('mathHeroScores');
       showHighscores();
     }
+  });
+
+  // --- Zeitraum-Filter (Gesamt / Heute / Monat) ---
+  document.querySelectorAll('.hs-filter-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      _hsFilter = this.getAttribute('data-filter');
+      _applyHsFilterButtons();
+      _loadAndRenderScores();
+    });
   });
 }
 
