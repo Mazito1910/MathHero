@@ -1269,8 +1269,10 @@ function startTimer() {
     SoundSystem.startLevelMusic(G.level);
   }
 
-  // Gegner-Position immer zurücksetzen (kein Einfrieren zwischen Aufgaben)
+  // Gegner-Position zurücksetzen und Distanz zum Spieler neu messen
   _resetEnemyPosition();
+  // Kurz warten bis Reset-Transition durch ist, dann messen
+  setTimeout(function() { G._enemyMaxShift = _calcEnemyShift(); }, 350);
 
   if (G.trainingMode) {
     var fill = $('time-fill'), txt = $('time-text');
@@ -1307,14 +1309,24 @@ function startTimer() {
   }, TICK);
 }
 
+// Exakte Pixel-Distanz zwischen Gegner und Spieler messen (einmal pro Aufgabe)
+function _calcEnemyShift() {
+  var es = $('enemy-sprite');
+  var ps = $('player-sprite');
+  if (!es || !ps) return 180;
+  var eRect = es.getBoundingClientRect();
+  var pRect = ps.getBoundingClientRect();
+  // Gegner soll den Spieler leicht überlappen (+ 30px)
+  var dist = eRect.left - pRect.right + 30;
+  return Math.max(dist, 80);
+}
+
 // Gegner-Position basierend auf verbleibender Zeit aktualisieren
 function _updateEnemyAdvance(progress) {
   var es = $('enemy-sprite');
   if (!es) return;
   // progress = 1 (volle Zeit) → 0 (Zeit abgelaufen)
-  // Gegner fängt weit rechts an und rückt nach links vor
-  var maxShift = 110; // px Richtung Spieler
-  var shift = (1 - progress) * maxShift;
+  var shift = (1 - progress) * (G._enemyMaxShift || 180);
   es.style.transform = 'translateX(-' + shift.toFixed(1) + 'px)';
 }
 
@@ -1343,19 +1355,22 @@ function stopTimer() {
 function timeUp() {
   if (G.trainingMode) return;
 
-  // Gegner-Angriffs-Animation: kurzer Einschlag auf den Spieler, dann zurück
+  // Gegner-Angriffs-Animation: direkt beim Spieler einschlagen, dann zurück
   var es = $('enemy-sprite');
+  var fullShift = G._enemyMaxShift || 180;
   if (es) {
-    es.style.transition = 'transform 0.15s ease-out';
-    es.style.transform = 'translateX(-160px) scale(1.15)'; // Angriff!
-    flash('rgba(255,0,0,0.45)');
+    // Schnell zum Spieler (letztes Stück falls noch nicht ganz da)
+    es.style.transition = 'transform 0.12s ease-out';
+    es.style.transform = 'translateX(-' + (fullShift + 15) + 'px) scale(1.2)';
+    flash('rgba(255,0,0,0.55)');
     setTimeout(function() {
       if (es) {
-        es.style.transition = 'transform 0.25s ease-in';
-        es.style.transform = 'translateX(0)';
-        setTimeout(function() { if (es) es.style.transition = ''; }, 260);
+        // Zurückprallen
+        es.style.transition = 'transform 0.28s ease-in';
+        es.style.transform = 'translateX(0) scale(1)';
+        setTimeout(function() { if (es) es.style.transition = ''; }, 300);
       }
-    }, 200);
+    }, 220);
   }
 
   G.lives--;
