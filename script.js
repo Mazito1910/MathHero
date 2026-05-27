@@ -20,9 +20,15 @@ const G = {
   selectedHero: null,
   playerName: '',
   trainingMode: false,
-  enemyHP: 5,          // visual HP for enemy
+  enemyHP: 5,
   enemyMaxHP: 5,
-  _musicLevel: 0       // tracks which level's music is loaded; 0 = none
+  _musicLevel: 0,
+  // ── Neue Feature-Felder ──
+  combo: 0,            // aktuelle Treffer-Serie
+  correctTotal: 0,     // korrekte Antworten gesamt (Power-Up-Trigger)
+  shield: false,       // Schild-Power-Up aktiv
+  doublePoints: false, // Doppel-Punkte aktiv (1 Aufgabe)
+  extraTime: 0         // Bonus-Sekunden für nächste Aufgabe
 };
 
 // =====================================================================
@@ -107,6 +113,9 @@ const SoundSystem = {
       this._sfxBlip.volume.value = -22;
 
       this._ready = true;
+      this.loadVolSettings();
+      this.applyMusicVolume();
+      this.applySfxVolume();
     } catch (e) { /* Autoplay-Policy — startet beim ersten Klick */ }
   },
 
@@ -115,6 +124,49 @@ const SoundSystem = {
     Tone.Transport.cancel(0);
     this._loops.forEach(function(l) { try { l.dispose(); } catch(e) {} });
     this._loops = [];
+  },
+
+  // ── Lautstärke-Einstellungen ──────────────────────────────────────────
+  _musicVol: 80,   // 0–100, wird aus localStorage geladen
+  _sfxVol:   80,
+
+  // pct → dB-Offset (100%→0dB, 50%→-6dB, 0%→stumm)
+  _pctToDb(pct) {
+    if (pct <= 0) return -100;
+    return 20 * Math.log10(pct / 100);
+  },
+
+  applyMusicVolume() {
+    var db = this._pctToDb(this._musicVol);
+    try {
+      if (this._mel)  this._mel.volume.value  = -12 + db;
+      if (this._bass) this._bass.volume.value = -14 + db;
+      if (this._pad)  this._pad.volume.value  = -18 + db;
+    } catch(e) {}
+  },
+
+  applySfxVolume() {
+    var db = this._pctToDb(this._sfxVol);
+    try {
+      if (this._kick)    this._kick.volume.value    = -10 + db;
+      if (this._snare)   this._snare.volume.value   = -18 + db;
+      if (this._hihat)   this._hihat.volume.value   = -27 + db;
+      if (this._sfxH)    this._sfxH.volume.value    = -13 + db;
+      if (this._sfxL)    this._sfxL.volume.value    = -17 + db;
+      if (this._sfxBlip) this._sfxBlip.volume.value = -22 + db;
+    } catch(e) {}
+  },
+
+  loadVolSettings() {
+    try {
+      var s = JSON.parse(localStorage.getItem('mathHeroVol') || '{}');
+      if (s.music !== undefined) this._musicVol = s.music;
+      if (s.sfx   !== undefined) this._sfxVol   = s.sfx;
+    } catch(e) {}
+  },
+
+  saveVolSettings() {
+    localStorage.setItem('mathHeroVol', JSON.stringify({ music: this._musicVol, sfx: this._sfxVol }));
   },
 
   // ================================================================
@@ -1280,9 +1332,11 @@ function startTimer() {
     if (txt)  txt.textContent = '∞';
     return;
   }
-  G.totalTime = Math.max(13, 23 - G.level);
+  G.totalTime = Math.max(13, 23 - G.level) + G.extraTime;
+  G.extraTime = 0;   // einmalig verbraucht
   G.timeLeft = G.totalTime;
   SoundSystem.lastWarningTime = 0;
+  updatePowerUpHUD();
   updateTimeBar(1);
 
   var TICK = 100;
@@ -1373,6 +1427,8 @@ function timeUp() {
     }, 220);
   }
 
+  G.combo = 0;
+  updateComboDisplay();
   G.lives--;
   SoundSystem.playLifeLost();
   updateHUD();
@@ -1403,6 +1459,135 @@ function showTask() {
   if (tsk) tsk.textContent = (G.taskIdx + 1) + '/5';
 
   startTimer();
+}
+
+// ── Level-Intro-Blende ────────────────────────────────────────────────────
+function showLevelIntro(level, callback) {
+  // Bestehenden Intro entfernen falls vorhanden
+  var old = document.getElementById('level-intro');
+  if (old) old.remove();
+
+  var en = ENEMIES[level] || {};
+  var div = document.createElement('div');
+  div.id = 'level-intro';
+  div.className = 'level-intro';
+  div.innerHTML =
+    '<div class="level-intro-label">LEVEL ' + level + '</div>'
+  + '<div class="level-intro-enemy-wrap">' + getEnemySVG(level) + '</div>'
+  + '<div class="level-intro-name">' + (en.name || '') + '</div>';
+
+  var arena = document.querySelector('.battle-arena');
+  if (arena) arena.appendChild(div);
+
+  // Nach Animation (1.7s) aufräumen und Spiel starten
+  setTimeout(function() {
+    if (div.parentNode) div.remove();
+    if (callback) callback();
+  }, 1700);
+}
+
+// ── Floating Score-Zahl ───────────────────────────────────────────────────
+function showFloatingScore(bonus, multiplier) {
+  var label = '+' + bonus;
+  if (multiplier >= 3)      label += ' 🔥🔥';
+  else if (multiplier >= 2) label += ' 🔥';
+  if (multiplier > 1)       label += ' ×' + multiplier;
+
+  var el = document.createElement('div');
+  el.className = 'floating-score';
+  el.textContent = label;
+
+  // Mittig über der Task-Box positionieren
+  var taskBox = document.querySelector('.task-box');
+  if (taskBox) {
+    var r = taskBox.getBoundingClientRect();
+    el.style.left = (r.left + r.width / 2 - 40) + 'px';
+    el.style.top  = (r.top - 10) + 'px';
+  } else {
+    el.style.left = '50%'; el.style.top = '40%';
+  }
+  document.body.appendChild(el);
+  setTimeout(function() { if (el.parentNode) el.remove(); }, 950);
+}
+
+// ── Combo aktualisieren ───────────────────────────────────────────────────
+function updateComboDisplay() {
+  var hud    = $('combo-hud');
+  var flames = $('combo-flames');
+  var label  = $('combo-label');
+  if (!hud) return;
+
+  var mult = comboMultiplier();
+  if (G.combo < 3 || mult <= 1) {
+    hud.style.display = 'none';
+    return;
+  }
+  var fireCount = mult >= 3 ? 2 : 1;
+  if (flames) flames.textContent = '🔥'.repeat(fireCount);
+  if (label)  label.textContent  = '×' + mult;
+  hud.style.display = '';
+  // Pop-Neustart durch Clone
+  hud.classList.remove('combo-hud');
+  void hud.offsetWidth;
+  hud.classList.add('combo-hud');
+}
+
+function comboMultiplier() {
+  if (G.combo >= 5) return 3;
+  if (G.combo >= 3) return 2;
+  return 1;
+}
+
+// ── Aktive Power-Ups im HUD anzeigen ─────────────────────────────────────
+function updatePowerUpHUD() {
+  var el = $('hud-powerups');
+  if (!el) return;
+  var badges = [];
+  if (G.shield)       badges.push('<span class="pu-active-badge" title="Schild aktiv">🛡</span>');
+  if (G.doublePoints) badges.push('<span class="pu-active-badge" title="Doppelte Punkte">⭐×2</span>');
+  if (G.extraTime > 0)badges.push('<span class="pu-active-badge" title="+Zeit">⏱+' + G.extraTime + 's</span>');
+  el.innerHTML = badges.join('');
+  el.style.display = badges.length ? '' : 'none';
+}
+
+// ── Power-Up Auswahl zeigen ───────────────────────────────────────────────
+var POWERUPS = [
+  { type: 'time',    icon: '⏱', title: '+5 Sekunden',       desc: 'Nächste Aufgabe: 5 Sekunden mehr Zeit' },
+  { type: 'shield',  icon: '🛡', title: 'Schild',            desc: 'Der nächste Fehler wird ignoriert' },
+  { type: 'double',  icon: '⭐', title: 'Doppelte Punkte',   desc: 'Nächste Aufgabe: 2× Punkte' }
+];
+
+function showPowerUp(afterCallback) {
+  var choices = $('powerup-choices');
+  if (!choices) { afterCallback(); return; }
+
+  // Zufällig 3 mischen (alle 3 sind es)
+  var html = '';
+  POWERUPS.forEach(function(p) {
+    html += '<button class="powerup-btn" data-type="' + p.type + '">'
+      + '<span class="pu-icon">' + p.icon + '</span>'
+      + '<span><span class="pu-title">' + p.title + '</span>'
+      + '<span class="pu-desc">' + p.desc + '</span></span>'
+      + '</button>';
+  });
+  choices.innerHTML = html;
+
+  choices.querySelectorAll('.powerup-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      applyPowerUp(this.getAttribute('data-type'));
+      showScreen('screen-game');
+      afterCallback();
+    }, { once: true });
+  });
+
+  showScreen('screen-powerup');
+}
+
+function applyPowerUp(type) {
+  if (type === 'time')   { G.extraTime = 5; }
+  if (type === 'shield') { G.shield = true; }
+  if (type === 'double') { G.doublePoints = true; }
+  updatePowerUpHUD();
 }
 
 function setLevelBackground(level) {
@@ -1657,37 +1842,74 @@ function checkAnswer() {
 }
 
 function correctAns() {
-  clearInterval(G.timer);      // stop countdown only — music keeps running
-  SoundSystem.setTempo(1);     // reset any time-warning tempo boost
-  _resetEnemyPosition();       // Gegner zurück an seinen Platz
+  clearInterval(G.timer);
+  SoundSystem.setTempo(1);
+  _resetEnemyPosition();
   SoundSystem.playCorrect();
   var inp = $('answer-input');
   if (inp) inp.className = 'correct';
 
-  var bonus = 10 * G.level + Math.floor(G.timeLeft * 2);
+  // Combo & Multiplikator
+  G.combo++;
+  G.correctTotal++;
+  var mult = comboMultiplier();
+  updateComboDisplay();
+
+  // Punkte berechnen (Double-Points Power-Up berücksichtigen)
+  var bonus = (10 * G.level + Math.floor(G.timeLeft * 2)) * mult;
+  if (G.doublePoints) { bonus *= 2; G.doublePoints = false; }
   G.score += bonus;
+
+  // Floating Score-Anzeige
+  showFloatingScore(bonus, mult * (G.doublePoints ? 2 : 1));
+
   flash('rgba(46,204,113,0.25)');
   updateHUD();
+  updatePowerUpHUD();
 
   G.taskIdx++;
   G.enemyHP = Math.max(0, 5 - G.taskIdx);
   updateEnemyHP();
 
   var isLastTask = (G.taskIdx >= 5);
-
-  // Animate attack
   doAttackAnimation(isLastTask);
 
   if (isLastTask) {
-    setTimeout(levelWin, isLastTask ? 900 : 400);
+    setTimeout(levelWin, 900);
+  } else if (!G.trainingMode && G.correctTotal % 5 === 0) {
+    // Alle 5 richtigen Antworten: Power-Up-Auswahl
+    setTimeout(function() { showPowerUp(function() { showTask(); }); }, 450);
   } else {
     setTimeout(showTask, 450);
   }
 }
 
 function wrongAns() {
+  // Schild-Power-Up: Fehler absorbieren
+  if (G.shield) {
+    G.shield = false;
+    updatePowerUpHUD();
+    var inp2 = $('answer-input');
+    if (inp2) { inp2.className = 'wrong'; inp2.value = ''; setTimeout(function(){ inp2.className=''; inp2.focus(); }, 400); }
+    flash('rgba(100,100,255,0.35)');
+    return;
+  }
+
   SoundSystem.playWrong();
   flash('rgba(231,76,60,0.35)');
+
+  // Combo zurücksetzen
+  G.combo = 0;
+  updateComboDisplay();
+
+  // Spieler-Shake-Animation
+  var ps = $('player-sprite');
+  if (ps) {
+    ps.classList.remove('player-shake');
+    void ps.offsetWidth; // reflow
+    ps.classList.add('player-shake');
+    setTimeout(function() { ps.classList.remove('player-shake'); }, 520);
+  }
 
   if (!G.trainingMode) G.lives--;
 
@@ -1731,7 +1953,8 @@ function nextLevel() {
     showBossTaunt();
   } else {
     generateTasks(); updateHUD(); updateSprites();
-    showScreen('screen-game'); showTask();
+    showScreen('screen-game');
+    showLevelIntro(G.level, showTask);
   }
 }
 
@@ -1962,10 +2185,14 @@ function startGame() {
 
   G.level = 1; G.score = 0; G.lives = 3; G.taskIdx = 0;
   G._musicLevel = 0;
+  G.combo = 0; G.correctTotal = 0;
+  G.shield = false; G.doublePoints = false; G.extraTime = 0;
   G.totalElapsed = 0; G.gameStartTime = Date.now();
 
   generateTasks(); updateHUD(); updateSprites();
-  showScreen('screen-game'); showTask();
+  updateComboDisplay(); updatePowerUpHUD();
+  showScreen('screen-game');
+  showLevelIntro(G.level, showTask);
 }
 
 function retryFromTimeout() {
@@ -2119,7 +2346,8 @@ function initGame() {
   $('btn-boss-accept').addEventListener('click', function() {
     SoundSystem.playClick();
     generateTasks(); updateHUD(); updateSprites();
-    showScreen('screen-game'); showTask();
+    showScreen('screen-game');
+    showLevelIntro(G.level, showTask);
   });
 
   // --- Timeout ---
@@ -2133,9 +2361,13 @@ function initGame() {
     SoundSystem.playClick();
     G.level = 1; G.score = 0; G.lives = 3; G.taskIdx = 0;
     G._musicLevel = 0;
+    G.combo = 0; G.correctTotal = 0;
+    G.shield = false; G.doublePoints = false; G.extraTime = 0;
     G.totalElapsed = 0; G.gameStartTime = Date.now();
     generateTasks(); updateHUD(); updateSprites();
-    showScreen('screen-game'); showTask();
+    updateComboDisplay(); updatePowerUpHUD();
+    showScreen('screen-game');
+    showLevelIntro(G.level, showTask);
   });
   $('btn-menu-gameover').addEventListener('click', goToMenu);
 
@@ -2147,9 +2379,13 @@ function initGame() {
     SoundSystem.playClick();
     G.level = 1; G.score = 0; G.lives = 3; G.taskIdx = 0;
     G._musicLevel = 0;
+    G.combo = 0; G.correctTotal = 0;
+    G.shield = false; G.doublePoints = false; G.extraTime = 0;
     G.totalElapsed = 0; G.gameStartTime = Date.now();
     generateTasks(); updateHUD(); updateSprites();
-    showScreen('screen-game'); showTask();
+    updateComboDisplay(); updatePowerUpHUD();
+    showScreen('screen-game');
+    showLevelIntro(G.level, showTask);
   });
 
   // --- Highscore ---
@@ -2159,6 +2395,31 @@ function initGame() {
       localStorage.removeItem('mathHeroScores');
       showHighscores();
     }
+  });
+
+  // --- Volume Settings ---
+  $('btn-settings').addEventListener('click', function() {
+    SoundSystem.loadVolSettings();
+    var sm = $('slider-music'), ss = $('slider-sfx');
+    var vm = $('vol-music-val'), vs = $('vol-sfx-val');
+    if (sm) { sm.value = SoundSystem._musicVol; vm.textContent = SoundSystem._musicVol + '%'; }
+    if (ss) { ss.value = SoundSystem._sfxVol;   vs.textContent = SoundSystem._sfxVol   + '%'; }
+    $('volume-modal').style.display = 'flex';
+  });
+  $('btn-vol-close').addEventListener('click', function() {
+    $('volume-modal').style.display = 'none';
+  });
+  $('slider-music').addEventListener('input', function() {
+    SoundSystem._musicVol = +this.value;
+    $('vol-music-val').textContent = this.value + '%';
+    SoundSystem.applyMusicVolume();
+    SoundSystem.saveVolSettings();
+  });
+  $('slider-sfx').addEventListener('input', function() {
+    SoundSystem._sfxVol = +this.value;
+    $('vol-sfx-val').textContent = this.value + '%';
+    SoundSystem.applySfxVolume();
+    SoundSystem.saveVolSettings();
   });
 
   // --- Zeitraum-Filter (Gesamt / Heute / Monat) ---

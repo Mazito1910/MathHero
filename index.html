@@ -21,7 +21,28 @@
       <button class="btn btn-training" id="btn-training">📚 TRAINING</button>
       <button class="btn btn-secondary" id="btn-highscore">🏆 HIGHSCORE</button>
     </div>
+    <button class="btn-settings-gear" id="btn-settings" title="Einstellungen">⚙️</button>
   </section>
+
+  <!-- ===== VOLUME SETTINGS MODAL ===== -->
+  <div id="volume-modal" class="volume-modal" style="display:none" role="dialog">
+    <div class="volume-panel">
+      <div class="volume-title">⚙️ EINSTELLUNGEN</div>
+      <div class="volume-row">
+        <span class="vol-icon">🎵</span>
+        <span class="vol-name">Musik</span>
+        <input type="range" id="slider-music" class="vol-slider" min="0" max="100" value="80">
+        <span class="vol-val" id="vol-music-val">80%</span>
+      </div>
+      <div class="volume-row">
+        <span class="vol-icon">🔊</span>
+        <span class="vol-name">Soundeffekte</span>
+        <input type="range" id="slider-sfx" class="vol-slider" min="0" max="100" value="80">
+        <span class="vol-val" id="vol-sfx-val">80%</span>
+      </div>
+      <button class="btn btn-primary" id="btn-vol-close" style="margin-top:.8rem">✓ FERTIG</button>
+    </div>
+  </div>
 
   <!-- ===== HERO SELECT ===== -->
   <section id="screen-hero-select" class="screen">
@@ -62,6 +83,13 @@
         <span class="hud-label">⭐</span>&nbsp;
         <span class="hud-val" id="hud-score">0</span>
       </div>
+      <!-- Combo-Anzeige -->
+      <div class="hud-item combo-hud" id="combo-hud" style="display:none">
+        <span id="combo-flames"></span>
+        <span class="combo-label" id="combo-label">×2</span>
+      </div>
+      <!-- Aktive Power-Ups -->
+      <div class="hud-item" id="hud-powerups" style="display:none"></div>
       <button class="btn-hud-exit" id="btn-hud-exit" title="Zurück zum Menü">✕</button>
     </div>
 
@@ -122,6 +150,14 @@
     </div>
     <div class="enemy-defeat-msg" id="win-enemy-msg"></div>
     <button class="btn btn-primary" id="btn-next-level">WEITER ➡</button>
+  </section>
+
+  <!-- ===== POWER-UP AUSWAHL ===== -->
+  <section id="screen-powerup" class="screen overlay-screen">
+    <div class="overlay-emoji">⚡</div>
+    <div class="overlay-title" style="color:#FFD700;">POWER-UP!</div>
+    <div class="overlay-sub">Wähle deine Belohnung:</div>
+    <div class="powerup-choices" id="powerup-choices"></div>
   </section>
 
   <!-- ===== BOSS TAUNT (vor Level 10) ===== -->
