@@ -519,6 +519,44 @@ var SupabaseDB = {
 // Pending-Sync auslösen wenn Browser wieder online kommt
 window.addEventListener('online', function() { SupabaseDB.syncPending(); });
 
+// Einmalige Migration: vorhandene localStorage-Scores → Supabase
+async function migrateLocalScoresToSupabase() {
+  // Bereits migriert oder keine lokalen Daten → überspringen
+  if (localStorage.getItem('mathHeroMigrated')) return;
+  var local = loadLocalScores();
+  if (!local.length) { localStorage.setItem('mathHeroMigrated', '1'); return; }
+
+  SupabaseDB.init();
+  if (!SupabaseDB.isOnline()) return; // kein Internet → beim nächsten Start erneut versuchen
+
+  // DD.MM.YYYY → ISO-Timestamp (Mitternacht)
+  function parseDate(str) {
+    var p = (str || '').split('.');
+    if (p.length < 3) return new Date().toISOString();
+    return new Date(+p[2], +p[1] - 1, +p[0]).toISOString();
+  }
+
+  var rows = local.map(function(s) {
+    return {
+      player_name:   s.name  || 'Held',
+      score:         s.score || 0,
+      level_reached: s.level || 1,
+      hero_index:    s.hero  || 0,
+      created_at:    parseDate(s.date)
+    };
+  });
+
+  try {
+    var res = await SupabaseDB._client.from('highscores').insert(rows);
+    if (!res.error) {
+      localStorage.setItem('mathHeroMigrated', '1');
+      console.log('[Migration] ' + rows.length + ' lokale Score(s) nach Supabase übertragen.');
+    }
+  } catch(e) {
+    console.warn('[Migration] Fehler:', e);
+  }
+}
+
 // One enemy per level (10 total), name + defeat message ({name} = player name)
 var ENEMIES = [
   null,
@@ -1898,6 +1936,9 @@ function _initOnce() {
   _gameInitialized = true;
   initGame();
   _tryAutoMusic();
+  // Einmalige Migration vorhandener localStorage-Scores → Supabase
+  SupabaseDB.init();
+  migrateLocalScoresToSupabase();
 }
 
 document.addEventListener('DOMContentLoaded', _initOnce);
