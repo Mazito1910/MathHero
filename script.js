@@ -1783,7 +1783,8 @@ var MatrixRain = (function () {
 // =====================================================================
 function initGame() {
   showScreen('screen-menu');
-  SoundSystem.startMenuMusic();
+  // Audio nicht hier starten — erst nach Nutzer-Interaktion erlaubt.
+  // Musik startet beim ersten Klick/Taste über den Listener am Ende der Datei.
 
   // --- Menu ---
   $('btn-play').addEventListener('click', function() {
@@ -1935,8 +1936,8 @@ function _initOnce() {
   if (_gameInitialized) return;
   _gameInitialized = true;
   initGame();
-  _tryAutoMusic();
-  // Einmalige Migration vorhandener localStorage-Scores → Supabase
+  // Kein Audio-Start hier — Browser blockiert das vor Nutzer-Interaktion.
+  // Der erste-Interaktion-Listener unten übernimmt das.
   SupabaseDB.init();
   migrateLocalScoresToSupabase();
 }
