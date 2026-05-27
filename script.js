@@ -1244,30 +1244,65 @@ function spawnProjectiles(isSuper) {
 // TASK GENERATION
 // =====================================================================
 function genOne(level) {
-  // Operations per level:
-  //  1-3  → nur + und −  (kleine Zahlen wachsen)
-  //  4-5  → + − und selten × (kleine Einmaleins-Einführung)
-  //  6-10 → + − × gleichwertig  (Einmaleins wächst mit Level)
-  var ops;
-  if      (level <= 3) ops = ['+', '-'];
-  else if (level <= 5) ops = ['+', '+', '-', '-', '×'];   // × seltener am Anfang
-  else                 ops = ['+', '-', '×'];
+  // Klare Schwierigkeitsprogression je Level:
+  // L1  Einfache Addition          (1–10 + 1–10)
+  // L2  Einfache Subtraktion       (bis 15, Ergebnis ≥ 1)
+  // L3  Gemischt + und -           (bis 20)
+  // L4  Schwerere Addition         (10–40 + 10–40)
+  // L5  Schwerere Subtraktion      (15–50)
+  // L6  Einfache Multiplikation    (×2 bis ×5)
+  // L7  Einfache Division          (÷2 bis ÷5, ganzzahlig)
+  // L8  Gemischt × und ÷           (Tabellen bis 10)
+  // L9  Alles gemischt, leicht-mittel (Ergebnis bis ~50)
+  // L10 Alles gemischt, schwer     (Ergebnis bis 100)
 
-  var op  = ops[rnd(0, ops.length - 1)];
-  var a, b, ans;
+  var op, a, b, ans;
 
-  if (op === '+') {
-    var mx = 5 + level * 2;                     // Lvl1→7, Lvl5→15, Lvl10→25
-    a = rnd(1, mx); b = rnd(1, mx); ans = a + b;
+  if (level === 1) {
+    op = '+'; a = rnd(1, 10); b = rnd(1, 10); ans = a + b;
 
-  } else if (op === '-') {
-    var mx = 7 + level * 2;                     // Lvl1→9, Lvl5→17, Lvl10→27
-    a = rnd(4, mx); b = rnd(1, a - 1); ans = a - b;
+  } else if (level === 2) {
+    op = '-'; a = rnd(2, 15); b = rnd(1, a - 1); ans = a - b;
+
+  } else if (level === 3) {
+    op = rnd(0, 1) ? '+' : '-';
+    if (op === '+') { a = rnd(1, 12); b = rnd(1, 12); ans = a + b; }
+    else            { a = rnd(3, 20); b = rnd(1, a - 1); ans = a - b; }
+
+  } else if (level === 4) {
+    op = '+'; a = rnd(10, 40); b = rnd(10, 40); ans = a + b;
+
+  } else if (level === 5) {
+    op = '-'; a = rnd(15, 50); b = rnd(5, a - 1); ans = a - b;
+
+  } else if (level === 6) {
+    op = '×';
+    a = rnd(2, 9); b = rnd(2, 5);
+    if (rnd(0, 1)) { var t = a; a = b; b = t; }  // Reihenfolge variieren
+    ans = a * b;
+
+  } else if (level === 7) {
+    op = '÷'; b = rnd(2, 5); ans = rnd(2, 9); a = ans * b;
+
+  } else if (level === 8) {
+    op = rnd(0, 1) ? '×' : '÷';
+    if (op === '×') { a = rnd(2, 10); b = rnd(2, 10); ans = a * b; }
+    else            { b = rnd(2, 10); ans = rnd(2, 10); a = ans * b; }
+
+  } else if (level === 9) {
+    var op9 = ['+', '-', '×', '÷'][rnd(0, 3)]; op = op9;
+    if      (op === '+') { a = rnd(1,  25); b = rnd(1, 25);              ans = a + b; }
+    else if (op === '-') { a = rnd(5,  45); b = rnd(1, Math.min(a-1,30)); ans = a - b; }
+    else if (op === '×') { a = rnd(2,  7);  b = rnd(2, 7);               ans = a * b; }
+    else                 { b = rnd(2,  7);  ans = rnd(2, 7); a = ans * b; }
 
   } else {
-    // Einmaleins-Tabelle wächst mit Level: Lvl4→2-3, Lvl6→2-5, Lvl10→2-10
-    var tbl = Math.min(3 + Math.floor((level - 4) * 1.2), 10);
-    a = rnd(2, tbl); b = rnd(2, tbl); ans = a * b;
+    // Level 10 — alles gemischt, Ergebnis max. 100
+    var op10 = ['+', '-', '×', '÷'][rnd(0, 3)]; op = op10;
+    if      (op === '+') { a = rnd(10, 60); b = rnd(10, Math.min(60, 100 - a)); ans = a + b; }
+    else if (op === '-') { a = rnd(20, 100); b = rnd(1, a - 1); ans = a - b; }
+    else if (op === '×') { a = rnd(3, 10);  b = rnd(3, Math.floor(100 / a)); ans = a * b; }
+    else                 { b = rnd(2, 10);  ans = rnd(2, 10); a = ans * b; }
   }
 
   return { text: a + ' ' + op + ' ' + b + ' = ?', answer: ans };
@@ -1849,8 +1884,13 @@ function correctAns() {
   var inp = $('answer-input');
   if (inp) inp.className = 'correct';
 
-  // Combo & Multiplikator
-  G.combo++;
+  // Combo: zählt nur wenn in der ersten Hälfte der Zeit beantwortet
+  var fastEnough = !G.trainingMode && (G.timeLeft >= G.totalTime / 2);
+  if (fastEnough) {
+    G.combo++;
+  } else if (!G.trainingMode) {
+    G.combo = 0;   // zu langsam → Combo bricht ab
+  }
   G.correctTotal++;
   var mult = comboMultiplier();
   updateComboDisplay();
