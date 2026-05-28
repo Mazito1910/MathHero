@@ -25,10 +25,11 @@ const G = {
   _musicLevel: 0,
   // ── Neue Feature-Felder ──
   combo: 0,            // aktuelle Treffer-Serie
-  correctTotal: 0,     // korrekte Antworten gesamt (Power-Up-Trigger)
+  correctTotal: 0,     // korrekte Antworten gesamt
   shield: false,       // Schild-Power-Up aktiv
   doublePoints: false, // Doppel-Punkte aktiv (1 Aufgabe)
-  extraTime: 0         // Bonus-Sekunden für nächste Aufgabe
+  extraTime: 0,        // Bonus-Sekunden für nächste Aufgabe
+  powerUpUsed: false   // Power-Up nach Level 5 bereits gezeigt
 };
 
 // =====================================================================
@@ -177,7 +178,7 @@ const SoundSystem = {
     if (!this._ready) return;
     this._stopLoops();
 
-    // Reset synths to soft menu preset (avoid harsh tier from previous game)
+    // Reset ALLE Synths auf weiche Menü-Werte — verhindert Clipping-Rückstände aus Tier 5
     try {
       this._mel.set({ oscillator: { type: 'triangle' },
                       envelope: { attack: 0.08, decay: 0.25, sustain: 0.55, release: 1.2 } });
@@ -188,6 +189,10 @@ const SoundSystem = {
       if (this._pad) this._pad.set({ oscillator: { type: 'triangle' } });
       this._pad.volume.value = -20;
       if (this._verb) this._verb.wet.value = 0.32;
+      // Drums: Lautstärke zurücksetzen damit kein Überlast-Zustand aus Tier 5 hängt
+      if (this._kick)  this._kick.volume.value  = -10 + this._pctToDb(this._sfxVol);
+      if (this._snare) this._snare.volume.value = -18 + this._pctToDb(this._sfxVol);
+      if (this._hihat) this._hihat.volume.value = -27 + this._pctToDb(this._sfxVol);
     } catch(e) {}
 
     this._baseBpm = 84;
@@ -350,24 +355,27 @@ const SoundSystem = {
            null,null,null,null,'C1',null,null,null])
       ]};
     }
-    // Tier 5 — d-Moll, 128 BPM: chromat. Abstieg, volle Drums + Hi-Hat, episch
-    // Charakter: Episch-dramatisch — Chromatik + Gegenstimme + Hi-Hat = maximale Spannung
-    return { bpm: 128, loops: [
+    // Tier 5 — d-Moll, 112 BPM: chromat. Abstieg, saubere Drums (kein Clipping)
+    // 128 BPM + 32n-Patterns → MetalSynth-Überlastung → auf 112 + 16n reduziert
+    return { bpm: 112, loops: [
       sq(function(t,v){ if(v) m.triggerAttackRelease(v,'16n',t); },
         ['D4','C4','Bb3','A3','G#3','A3','C4','D4',
          'F4','A4','D5','C5','Bb4','A4','G#4','A4']),
       sq(function(t,v){ if(v) b.triggerAttackRelease(v,'8n',t); },
         ['D2',null,'A2',null,'Bb2',null,'A2',null,
          'D2',null,'F2',null,'A2',null,'Bb2',null]),
+      // Kick: sauber auf Zählzeit 1 und 3 — kein Dreifach-Schlag
       sq(function(t,v){ if(v) k.triggerAttackRelease(v,'8n',t); },
-        ['C1',null,'C1',null,'C1',null,'C1',null,
-         'C1','C1','C1',null,'C1',null,'C1',null]),
-      sq(function(t,v){ if(v) s.triggerAttackRelease('32n',t); },
+        ['C1',null,null,null,'C1',null,null,null,
+         'C1',null,null,null,'C1',null,null,null]),
+      // Snare: '16n' statt '32n' — verhindert Clipping
+      sq(function(t,v){ if(v) s.triggerAttackRelease('16n',t); },
         [null,null,null,null,'C1',null,null,null,
-         null,null,null,null,'C1',null,'C1',null]),
-      sq(function(t,v){ if(v) h.triggerAttackRelease('C6','32n',t); },
-        ['C1','C1','C1','C1','C1','C1','C1','C1',
-         'C1','C1','C1','C1','C1','C1','C1','C1'])
+         null,null,null,null,'C1',null,null,null]),
+      // Hihat: nur jeden 2. Achtel — MetalSynth nicht überlasten
+      sq(function(t,v){ if(v) h.triggerAttackRelease('C6','16n',t); },
+        ['C1',null,'C1',null,'C1',null,'C1',null,
+         'C1',null,'C1',null,'C1',null,'C1',null])
     ]};
   },
 
@@ -1498,6 +1506,12 @@ function showTask() {
 
 // ── Level-Intro-Blende ────────────────────────────────────────────────────
 function showLevelIntro(level, callback) {
+  // Alten Aufgaben-Text sofort leeren — sonst sieht man die letzte Aufgabe des Vorlevels
+  var taskEl = $('math-task'), inputEl = $('answer-input'), dotsEl = $('task-dots');
+  if (taskEl)  taskEl.textContent = '';
+  if (inputEl) { inputEl.value = ''; inputEl.className = ''; }
+  if (dotsEl)  dotsEl.innerHTML = '';
+
   // Bestehenden Intro entfernen falls vorhanden
   var old = document.getElementById('level-intro');
   if (old) old.remove();
@@ -1916,9 +1930,6 @@ function correctAns() {
 
   if (isLastTask) {
     setTimeout(levelWin, 900);
-  } else if (!G.trainingMode && G.correctTotal % 5 === 0) {
-    // Alle 5 richtigen Antworten: Power-Up-Auswahl
-    setTimeout(function() { showPowerUp(function() { showTask(); }); }, 450);
   } else {
     setTimeout(showTask, 450);
   }
@@ -1985,6 +1996,16 @@ function levelWin() {
 }
 
 function nextLevel() {
+  // Einmaliger Power-Up nach Abschluss von Level 5 (nur Normal-Modus)
+  if (G.level === 5 && !G.trainingMode && !G.powerUpUsed) {
+    G.powerUpUsed = true;
+    showPowerUp(function() { _doNextLevel(); });
+    return;
+  }
+  _doNextLevel();
+}
+
+function _doNextLevel() {
   G.level++;
   G.taskIdx = 0;
   if (G.level > 10) {
@@ -2226,7 +2247,7 @@ function startGame() {
   G.level = 1; G.score = 0; G.lives = 3; G.taskIdx = 0;
   G._musicLevel = 0;
   G.combo = 0; G.correctTotal = 0;
-  G.shield = false; G.doublePoints = false; G.extraTime = 0;
+  G.shield = false; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
   G.totalElapsed = 0; G.gameStartTime = Date.now();
 
   generateTasks(); updateHUD(); updateSprites();
@@ -2402,7 +2423,7 @@ function initGame() {
     G.level = 1; G.score = 0; G.lives = 3; G.taskIdx = 0;
     G._musicLevel = 0;
     G.combo = 0; G.correctTotal = 0;
-    G.shield = false; G.doublePoints = false; G.extraTime = 0;
+    G.shield = false; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
     G.totalElapsed = 0; G.gameStartTime = Date.now();
     generateTasks(); updateHUD(); updateSprites();
     updateComboDisplay(); updatePowerUpHUD();
@@ -2420,7 +2441,7 @@ function initGame() {
     G.level = 1; G.score = 0; G.lives = 3; G.taskIdx = 0;
     G._musicLevel = 0;
     G.combo = 0; G.correctTotal = 0;
-    G.shield = false; G.doublePoints = false; G.extraTime = 0;
+    G.shield = false; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
     G.totalElapsed = 0; G.gameStartTime = Date.now();
     generateTasks(); updateHUD(); updateSprites();
     updateComboDisplay(); updatePowerUpHUD();
