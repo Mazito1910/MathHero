@@ -87,12 +87,16 @@ const SoundSystem = {
       }).toDestination();
       this._snare.volume.value = -18;
 
-      this._hihat = new Tone.MetalSynth({
-        frequency: 500,
-        envelope: { attack: 0.001, decay: 0.08, release: 0.01 },
-        harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5
-      }).toDestination();
-      this._hihat.volume.value = -27;
+      // NoiseSynth + Hochpassfilter statt MetalSynth — deutlich stabiler, kein Crackling
+      var _hihatHPF = new Tone.Filter({ frequency: 6000, type: 'highpass' }).toDestination();
+      this._hihat = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 }
+      }).connect(_hihatHPF);
+      this._hihat.volume.value = -22;
+
+      // Master-Ausgang um 4 dB absenken → verhindert Clipping bei gleichzeitigen Sounds
+      try { Tone.getDestination().volume.value = -4; } catch(e) {}
 
       // SFX-Synths — leiser als vorher, damit Melodie nicht übertönt wird
       this._sfxH = new Tone.PolySynth(Tone.Synth, {
@@ -151,7 +155,7 @@ const SoundSystem = {
     try {
       if (this._kick)    this._kick.volume.value    = -10 + db;
       if (this._snare)   this._snare.volume.value   = -18 + db;
-      if (this._hihat)   this._hihat.volume.value   = -27 + db;
+      if (this._hihat)   this._hihat.volume.value   = -22 + db;
       if (this._sfxH)    this._sfxH.volume.value    = -13 + db;
       if (this._sfxL)    this._sfxL.volume.value    = -17 + db;
       if (this._sfxBlip) this._sfxBlip.volume.value = -22 + db;
@@ -192,7 +196,7 @@ const SoundSystem = {
       // Drums: Lautstärke zurücksetzen damit kein Überlast-Zustand aus Tier 5 hängt
       if (this._kick)  this._kick.volume.value  = -10 + this._pctToDb(this._sfxVol);
       if (this._snare) this._snare.volume.value = -18 + this._pctToDb(this._sfxVol);
-      if (this._hihat) this._hihat.volume.value = -27 + this._pctToDb(this._sfxVol);
+      if (this._hihat) this._hihat.volume.value = -22 + this._pctToDb(this._sfxVol);
     } catch(e) {}
 
     this._baseBpm = 84;
@@ -373,7 +377,7 @@ const SoundSystem = {
         [null,null,null,null,'C1',null,null,null,
          null,null,null,null,'C1',null,null,null]),
       // Hihat: nur jeden 2. Achtel — MetalSynth nicht überlasten
-      sq(function(t,v){ if(v) h.triggerAttackRelease('C6','16n',t); },
+      sq(function(t,v){ if(v) h.triggerAttackRelease('16n',t); },
         ['C1',null,'C1',null,'C1',null,'C1',null,
          'C1',null,'C1',null,'C1',null,'C1',null])
     ]};
@@ -466,10 +470,10 @@ document.addEventListener('click', async function() {
 // CHARACTERS & ENEMIES
 // =====================================================================
 var CHARACTERS = [
-  { name: 'Katzen-Hexe',  color: '#8e24aa' },
-  { name: 'Robo-Rika',    color: '#00838f' },
-  { name: 'Ritter Leo',   color: '#1565c0' },
-  { name: 'Fuchs-Ranger', color: '#388e3c' }
+  { name: 'Katzen-Hexe',      color: '#8e24aa' },
+  { name: 'Power-Prinzessin', color: '#c2185b' },
+  { name: 'Ritter Leo',       color: '#1565c0' },
+  { name: 'Ninja',            color: '#212121' }
 ];
 
 // =====================================================================
@@ -694,49 +698,71 @@ function getCharSVG(index) {
     + '<path d="M46 58 Q50 63 54 58" stroke="#bf360c" fill="none" stroke-width="1.5"/>'
     + '</svg>';
 
-  // 1 – Robo-Rika (female robot)
+  // 1 – Power-Prinzessin (Prinzessin im Kampfmodus)
   if (index === 1) return '<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">'
-    + '<rect x="34" y="94" width="14" height="20" rx="4" fill="#00838f"/>'
-    + '<rect x="52" y="94" width="14" height="20" rx="4" fill="#00838f"/>'
-    + '<rect x="30" y="107" width="19" height="8" rx="4" fill="#006064"/>'
-    + '<rect x="51" y="107" width="19" height="8" rx="4" fill="#006064"/>'
-    + '<circle cx="41" cy="94" r="5" fill="#7b1fa2"/>'
-    + '<circle cx="59" cy="94" r="5" fill="#7b1fa2"/>'
-    + '<rect x="22" y="58" width="56" height="38" rx="10" fill="#00838f"/>'
-    + '<rect x="27" y="63" width="46" height="26" rx="6" fill="#00acc1"/>'
-    + '<rect x="29" y="73" width="42" height="10" rx="3" fill="#006064"/>'
-    + '<text x="50" y="81" text-anchor="middle" font-size="5.5" fill="#e0f7fa" font-weight="bold">ROBOTICS</text>'
-    + '<circle cx="50" cy="66" r="5" fill="#e91e63"/>'
-    + '<circle cx="50" cy="66" r="3" fill="#ff80ab"/>'
-    + '<rect x="24" y="88" width="11" height="8" rx="2" fill="#006064"/>'
-    + '<rect x="65" y="88" width="11" height="8" rx="2" fill="#006064"/>'
-    + '<rect x="9" y="60" width="14" height="28" rx="6" fill="#00838f"/>'
-    + '<rect x="77" y="56" width="14" height="28" rx="6" fill="#00838f"/>'
-    + '<rect x="75" y="48" width="17" height="14" rx="6" fill="#00acc1"/>'
-    + '<rect x="77" y="44" width="13" height="9" rx="4" fill="#7b1fa2"/>'
-    + '<circle cx="24" cy="62" r="5" fill="#7b1fa2"/>'
-    + '<circle cx="76" cy="62" r="5" fill="#7b1fa2"/>'
-    + '<rect x="42" y="50" width="16" height="10" rx="4" fill="#00acc1"/>'
-    + '<rect x="26" y="22" width="48" height="32" rx="10" fill="#00838f"/>'
-    + '<rect x="26" y="22" width="48" height="9" rx="10" fill="#6a1b9a"/>'
-    + '<ellipse cx="50" cy="20" rx="17" ry="7" fill="#f06292"/>'
-    + '<path d="M29 27 Q27 20 33 17" stroke="#f06292" stroke-width="4" fill="none" stroke-linecap="round"/>'
-    + '<path d="M71 27 Q73 20 67 17" stroke="#f06292" stroke-width="4" fill="none" stroke-linecap="round"/>'
-    + '<rect x="32" y="36" width="36" height="12" rx="6" fill="#004d40"/>'
-    + '<ellipse cx="42" cy="42" rx="7" ry="4" fill="#00e5ff"/>'
-    + '<ellipse cx="42" cy="42" rx="4" ry="2.5" fill="#80ffff"/>'
-    + '<ellipse cx="58" cy="42" rx="7" ry="4" fill="#00e5ff"/>'
-    + '<ellipse cx="58" cy="42" rx="4" ry="2.5" fill="#80ffff"/>'
-    + '<circle cx="26" cy="39" r="7" fill="#4527a0"/>'
-    + '<circle cx="74" cy="39" r="7" fill="#4527a0"/>'
-    + '<circle cx="26" cy="39" r="4" fill="#7b1fa2"/>'
-    + '<circle cx="74" cy="39" r="4" fill="#7b1fa2"/>'
-    + '<rect x="37" y="50" width="26" height="5" rx="2" fill="#004d40"/>'
-    + '<line x1="41" y1="52" x2="41" y2="54" stroke="#00e5ff" stroke-width="1.2"/>'
-    + '<line x1="46" y1="52" x2="46" y2="54" stroke="#00e5ff" stroke-width="1.2"/>'
-    + '<line x1="51" y1="52" x2="51" y2="54" stroke="#00e5ff" stroke-width="1.2"/>'
-    + '<line x1="56" y1="52" x2="56" y2="54" stroke="#00e5ff" stroke-width="1.2"/>'
-    + '<line x1="61" y1="52" x2="61" y2="54" stroke="#00e5ff" stroke-width="1.2"/>'
+    // ── Kampf-Kleid ────────────────────────────────────────────────────
+    + '<path d="M28 68 Q21 118 50 120 Q79 118 72 68Z" fill="#c2185b"/>'
+    + '<ellipse cx="50" cy="69" rx="24" ry="12" fill="#d81b60"/>'
+    + '<path d="M28 70 Q50 82 72 70" stroke="#ffd600" stroke-width="2.5" fill="none"/>'
+    + '<path d="M24 84 Q50 96 76 84" stroke="#ffd600" stroke-width="1.5" fill="none" opacity=".5"/>'
+    // ── Körperpanzer ───────────────────────────────────────────────────
+    + '<rect x="35" y="54" width="30" height="17" rx="5" fill="#880e4f"/>'
+    + '<ellipse cx="50" cy="62" rx="6.5" ry="5.5" fill="#ffd600"/>'
+    + '<ellipse cx="50" cy="62" rx="3.5" ry="3" fill="#fff9c4"/>'
+    + '<ellipse cx="50" cy="62" rx="1.8" ry="1.8" fill="#e91e63"/>'
+    + '<ellipse cx="36" cy="56" rx="8" ry="6" fill="#ad1457" transform="rotate(-18 36 56)"/>'
+    + '<ellipse cx="64" cy="56" rx="8" ry="6" fill="#ad1457" transform="rotate(18 64 56)"/>'
+    // ── Arme ───────────────────────────────────────────────────────────
+    + '<ellipse cx="26" cy="67" rx="8" ry="13" fill="#ad1457" transform="rotate(-12 26 67)"/>'
+    + '<ellipse cx="74" cy="67" rx="8" ry="13" fill="#ad1457" transform="rotate(12 74 67)"/>'
+    + '<ellipse cx="20" cy="79" rx="7" ry="5" fill="#ffd6e8"/>'
+    + '<ellipse cx="80" cy="79" rx="7" ry="5" fill="#ffd6e8"/>'
+    // ── Magie-Szepter ──────────────────────────────────────────────────
+    + '<line x1="80" y1="77" x2="92" y2="52" stroke="#7b1fa2" stroke-width="4" stroke-linecap="round"/>'
+    + '<polygon points="87,47 92,39 97,47 92,55" fill="#ffd600"/>'
+    + '<circle cx="92" cy="46" r="5.5" fill="#e040fb" opacity=".85"/>'
+    + '<circle cx="92" cy="46" r="2.5" fill="#fff59d"/>'
+    + '<circle cx="87" cy="41" r="2" fill="#e040fb" opacity=".6"/>'
+    + '<circle cx="97" cy="42" r="1.5" fill="#fff59d" opacity=".7"/>'
+    // ── Kopf ───────────────────────────────────────────────────────────
+    + '<circle cx="50" cy="37" r="21" fill="#ffd6e8"/>'
+    // ── Haare (Seiten-Strähnen) ────────────────────────────────────────
+    + '<path d="M30 26 Q14 42 18 66 Q25 50 31 45" fill="#7b1fa2" opacity=".9"/>'
+    + '<path d="M70 26 Q86 42 82 66 Q75 50 69 45" fill="#7b1fa2" opacity=".9"/>'
+    + '<circle cx="16" cy="56" r="5.5" fill="#6a1b9a"/>'
+    + '<circle cx="84" cy="56" r="5.5" fill="#6a1b9a"/>'
+    + '<circle cx="16" cy="56" r="3" fill="#ce93d8"/>'
+    + '<circle cx="84" cy="56" r="3" fill="#ce93d8"/>'
+    + '<path d="M30 25 Q50 13 70 25 Q60 17 50 15 Q40 17 30 25" fill="#6a1b9a"/>'
+    // ── Krone ─────────────────────────────────────────────────────────
+    + '<polygon points="30,25 36,11 43,22 50,8 57,22 64,11 70,25" fill="#ffd600"/>'
+    + '<circle cx="50" cy="9" r="3.5" fill="#e91e63"/>'
+    + '<circle cx="36" cy="13" r="2.5" fill="#42a5f5"/>'
+    + '<circle cx="64" cy="13" r="2.5" fill="#00e5ff"/>'
+    + '<rect x="29" y="24" width="42" height="6" rx="3" fill="#ffd600"/>'
+    // ── Augen ─────────────────────────────────────────────────────────
+    + '<ellipse cx="42" cy="39" rx="8" ry="7" fill="white"/>'
+    + '<ellipse cx="58" cy="39" rx="8" ry="7" fill="white"/>'
+    + '<circle cx="42" cy="39" r="5" fill="#6a1b9a"/>'
+    + '<circle cx="58" cy="39" r="5" fill="#6a1b9a"/>'
+    + '<circle cx="43" cy="38" r="2" fill="#1a1a1a"/>'
+    + '<circle cx="59" cy="38" r="2" fill="#1a1a1a"/>'
+    + '<circle cx="44" cy="37.2" r="1" fill="white"/>'
+    + '<circle cx="60" cy="37.2" r="1" fill="white"/>'
+    // Wimpern
+    + '<line x1="35" y1="33" x2="34" y2="30" stroke="#4a148c" stroke-width="1.5"/>'
+    + '<line x1="39" y1="32" x2="39" y2="29" stroke="#4a148c" stroke-width="1.5"/>'
+    + '<line x1="44" y1="32" x2="45" y2="29" stroke="#4a148c" stroke-width="1.5"/>'
+    + '<line x1="55" y1="32" x2="55" y2="29" stroke="#4a148c" stroke-width="1.5"/>'
+    + '<line x1="59" y1="32" x2="60" y2="29" stroke="#4a148c" stroke-width="1.5"/>'
+    + '<line x1="63" y1="33" x2="64" y2="30" stroke="#4a148c" stroke-width="1.5"/>'
+    // ── Nase & Mund ───────────────────────────────────────────────────
+    + '<ellipse cx="50" cy="46" rx="2" ry="1.5" fill="#e8a0b4"/>'
+    + '<path d="M44 50 Q50 56 56 50" stroke="#c2185b" fill="none" stroke-width="1.5"/>'
+    + '<path d="M46 50.5 Q50 54 54 50.5" fill="#ff80ab"/>'
+    // ── Stiefel ───────────────────────────────────────────────────────
+    + '<rect x="32" y="108" width="16" height="10" rx="5" fill="#880e4f"/>'
+    + '<rect x="52" y="108" width="16" height="10" rx="5" fill="#880e4f"/>'
     + '</svg>';
 
   // 2 – Ritter Leo (male knight)
@@ -782,45 +808,57 @@ function getCharSVG(index) {
     + '<path d="M44 49 Q50 54 56 49" stroke="#e65100" fill="none" stroke-width="1.5"/>'
     + '</svg>';
 
-  // 3 – Fuchs-Ranger (male fox scout)
+  // 3 – Ninja
   return '<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">'
-    + '<rect x="34" y="91" width="14" height="22" rx="4" fill="#2e7d32"/>'
-    + '<rect x="52" y="91" width="14" height="22" rx="4" fill="#2e7d32"/>'
-    + '<rect x="31" y="106" width="18" height="8" rx="3" fill="#4e342e"/>'
-    + '<rect x="51" y="106" width="18" height="8" rx="3" fill="#4e342e"/>'
-    + '<rect x="28" y="60" width="44" height="34" rx="9" fill="#388e3c"/>'
-    + '<rect x="44" y="60" width="12" height="22" fill="#2e7d32"/>'
-    + '<rect x="27" y="88" width="46" height="7" rx="3" fill="#5d4037"/>'
-    + '<rect x="46" y="87" width="8" height="9" rx="1" fill="#ffd600"/>'
-    + '<rect x="68" y="65" width="15" height="22" rx="4" fill="#6d4c41"/>'
-    + '<rect x="70" y="67" width="11" height="6" rx="2" fill="#8d6e63"/>'
-    + '<ellipse cx="50" cy="62" rx="11" ry="8" fill="#ff8f00"/>'
-    + '<rect x="12" y="61" width="17" height="13" rx="6" fill="#388e3c" transform="rotate(18 12 61)"/>'
-    + '<circle cx="14" cy="77" r="7" fill="#ff8f00"/>'
-    + '<circle cx="14" cy="77" r="6" fill="#f5f5f5" stroke="#9e9e9e" stroke-width="1"/>'
-    + '<line x1="14" y1="72" x2="14" y2="77" stroke="#f44336" stroke-width="1.5"/>'
-    + '<line x1="14" y1="77" x2="19" y2="77" stroke="#9e9e9e" stroke-width="1"/>'
-    + '<circle cx="14" cy="77" r="1.5" fill="#9e9e9e"/>'
-    + '<rect x="71" y="62" width="17" height="12" rx="6" fill="#388e3c" transform="rotate(-18 71 62)"/>'
-    + '<ellipse cx="50" cy="40" rx="22" ry="21" fill="#ff8f00"/>'
-    + '<ellipse cx="50" cy="52" rx="13" ry="9" fill="#fff9c4"/>'
-    + '<ellipse cx="50" cy="48" rx="4" ry="3" fill="#1a1a1a"/>'
-    + '<polygon points="35,26 29,8 44,20" fill="#ff8f00"/>'
-    + '<polygon points="65,26 71,8 56,20" fill="#ff8f00"/>'
-    + '<polygon points="36,24 32,11 43,20" fill="#e91e63"/>'
-    + '<polygon points="64,24 68,11 57,20" fill="#e91e63"/>'
-    + '<ellipse cx="50" cy="26" rx="27" ry="6" fill="#2e7d32"/>'
-    + '<rect x="31" y="13" width="38" height="15" rx="4" fill="#388e3c"/>'
-    + '<ellipse cx="56" cy="16" rx="6" ry="3" fill="#66bb6a" transform="rotate(-20 56 16)"/>'
-    + '<circle cx="42" cy="37" r="5.5" fill="#fff"/>'
-    + '<circle cx="58" cy="37" r="5.5" fill="#fff"/>'
-    + '<circle cx="43" cy="37" r="3.5" fill="#5d4037"/>'
-    + '<circle cx="59" cy="37" r="3.5" fill="#5d4037"/>'
-    + '<circle cx="43.8" cy="36.3" r="1.1" fill="#fff"/>'
-    + '<circle cx="59.8" cy="36.3" r="1.1" fill="#fff"/>'
-    + '<path d="M46 52 Q50 57 54 52" stroke="#5d4037" fill="none" stroke-width="1.5"/>'
-    + '<path d="M70 98 Q88 94 87 106 Q82 101 74 105Z" fill="#ff8f00"/>'
-    + '<path d="M83 108 Q87 104 86 109 Q83 110 81 109Z" fill="#fff9c4"/>'
+    // ── Beine ──────────────────────────────────────────────────────────
+    + '<rect x="34" y="90" width="13" height="24" rx="4" fill="#212121"/>'
+    + '<rect x="53" y="90" width="13" height="24" rx="4" fill="#212121"/>'
+    + '<rect x="32" y="107" width="17" height="8" rx="3" fill="#1a1a1a"/>'
+    + '<rect x="51" y="107" width="17" height="8" rx="3" fill="#1a1a1a"/>'
+    // ── Körper ─────────────────────────────────────────────────────────
+    + '<rect x="27" y="55" width="46" height="38" rx="9" fill="#212121"/>'
+    + '<rect x="27" y="78" width="46" height="7" rx="3" fill="#b71c1c"/>'
+    + '<rect x="44" y="77" width="12" height="9" rx="1" fill="#c62828"/>'
+    + '<text x="50" y="72" text-anchor="middle" font-size="10" fill="#b71c1c" opacity=".45" font-family="serif">&#24503;</text>'
+    // Wurfstern am Gürtel
+    + '<polygon points="37,82 39.5,77.5 42,82 36.5,79.5 42.5,79.5" fill="#90a4ae"/>'
+    + '<polygon points="39.5,75 41.5,80.5 39.5,82.5 37.5,80.5" fill="#78909c"/>'
+    // ── Katana (auf Rücken) ────────────────────────────────────────────
+    + '<rect x="65" y="38" width="4.5" height="58" rx="2" fill="#546e7a" transform="rotate(12 65 38)"/>'
+    + '<rect x="65.8" y="40" width="2.5" height="55" rx="1" fill="#e0e0e0" transform="rotate(12 65.8 40)"/>'
+    + '<rect x="62" y="36" width="11" height="7" rx="2" fill="#795548" transform="rotate(12 62 36)"/>'
+    // ── Arme ───────────────────────────────────────────────────────────
+    + '<rect x="9" y="57" width="18" height="28" rx="7" fill="#212121"/>'
+    + '<rect x="73" y="57" width="18" height="28" rx="7" fill="#212121"/>'
+    + '<ellipse cx="18" cy="88" rx="8" ry="6" fill="#1a1a1a"/>'
+    + '<ellipse cx="82" cy="88" rx="8" ry="6" fill="#1a1a1a"/>'
+    // ── Halsabdeckung ─────────────────────────────────────────────────
+    + '<rect x="36" y="51" width="28" height="9" rx="4" fill="#212121"/>'
+    // ── Kopf ───────────────────────────────────────────────────────────
+    + '<circle cx="50" cy="33" r="21" fill="#212121"/>'
+    // ── Stirnband (rot mit Knoten rechts) ─────────────────────────────
+    + '<rect x="29" y="26" width="42" height="9" rx="4" fill="#b71c1c"/>'
+    + '<ellipse cx="75" cy="28" rx="8" ry="5" fill="#c62828" transform="rotate(-12 75 28)"/>'
+    + '<rect x="72" y="27" width="5" height="18" rx="3" fill="#b71c1c" transform="rotate(-8 72 27)"/>'
+    // Stirnband-Symbol
+    + '<circle cx="50" cy="30" r="5" fill="#c62828"/>'
+    + '<text x="50" y="34.5" text-anchor="middle" font-size="7" fill="white" font-weight="bold" font-family="serif">&#24503;</text>'
+    // ── Gesichtsmaske ─────────────────────────────────────────────────
+    + '<rect x="29" y="35" width="42" height="18" rx="5" fill="#212121"/>'
+    + '<line x1="32" y1="39" x2="68" y2="39" stroke="#1a1a1a" stroke-width="2" opacity=".6"/>'
+    + '<line x1="32" y1="44" x2="68" y2="44" stroke="#1a1a1a" stroke-width="2" opacity=".6"/>'
+    // ── Augen (rot leuchtend) ─────────────────────────────────────────
+    + '<ellipse cx="40" cy="40" rx="7.5" ry="5" fill="#1a1a1a"/>'
+    + '<ellipse cx="60" cy="40" rx="7.5" ry="5" fill="#1a1a1a"/>'
+    + '<ellipse cx="40" cy="40" rx="5" ry="3.5" fill="#b71c1c"/>'
+    + '<ellipse cx="60" cy="40" rx="5" ry="3.5" fill="#b71c1c"/>'
+    + '<ellipse cx="40" cy="40" rx="2.8" ry="2.2" fill="#e53935"/>'
+    + '<ellipse cx="60" cy="40" rx="2.8" ry="2.2" fill="#e53935"/>'
+    + '<circle cx="41" cy="39.2" r="1" fill="white" opacity=".5"/>'
+    + '<circle cx="61" cy="39.2" r="1" fill="white" opacity=".5"/>'
+    // Augen-Leuchtring
+    + '<ellipse cx="40" cy="40" rx="7" ry="5" fill="none" stroke="#e53935" stroke-width="1" opacity=".4"/>'
+    + '<ellipse cx="60" cy="40" rx="7" ry="5" fill="none" stroke="#e53935" stroke-width="1" opacity=".4"/>'
     + '</svg>';
 }
 
@@ -1329,6 +1367,8 @@ function updateHUD() {
   if (lvl) lvl.textContent = G.level;
   if (scr) scr.textContent = G.trainingMode ? '–' : G.score;
   if (tsk) tsk.textContent = Math.min(G.taskIdx + 1, 5) + '/5';
+  var maxLvEl = $('hud-max-level');
+  if (maxLvEl) maxLvEl.textContent = G.trainingMode ? '/5' : '/10';
 
   var heartsDiv = $('hud-hearts');
   if (heartsDiv) {
@@ -2008,9 +2048,10 @@ function nextLevel() {
 function _doNextLevel() {
   G.level++;
   G.taskIdx = 0;
-  if (G.level > 10) {
+  var maxLv = G.trainingMode ? 5 : 10;
+  if (G.level > maxLv) {
     victory();
-  } else if (G.level === 10) {
+  } else if (G.level === 10 && !G.trainingMode) {
     showBossTaunt();
   } else {
     generateTasks(); updateHUD(); updateSprites();
@@ -2452,9 +2493,13 @@ function initGame() {
   // --- Highscore ---
   $('btn-back-highscore').addEventListener('click', goToMenu);
   $('btn-clear-scores').addEventListener('click', function() {
-    if (confirm('Alle Highscores löschen?')) {
+    if (confirm('Lokale Scores löschen?\n(Online-Scores bleiben global gespeichert.)')) {
       localStorage.removeItem('mathHeroScores');
-      showHighscores();
+      localStorage.removeItem('mathHeroPending');
+      var list = $('highscore-list');
+      var badge = $('hs-source-badge');
+      if (list) list.innerHTML = '<p class="hs-empty">Lokale Scores gelöscht 🗑</p>';
+      if (badge) badge.textContent = '🗑 Gelöscht – klicke einen Filter für Online-Scores';
     }
   });
 

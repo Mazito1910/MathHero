@@ -1129,7 +1129,7 @@ body::before {
    ========================================================= */
 .btn-settings-gear {
   position: absolute;
-  bottom: 1.2rem; right: 1.4rem;
+  top: 1.2rem; right: 1.4rem;
   background: rgba(255,255,255,.1);
   border: 1.5px solid rgba(255,255,255,.2);
   border-radius: 50%;
