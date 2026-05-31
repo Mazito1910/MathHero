@@ -1356,7 +1356,10 @@ function genOne(level) {
 
 function generateTasks() {
   G.tasks = [];
-  for (var i = 0; i < 5; i++) G.tasks.push(genOne(G.level));
+  // Training: L1→genOne(1) Addition, L2→genOne(3) gemischt +/−, L3→genOne(5) Subtraktion schwer,
+  //           L4→genOne(7) Division, L5→genOne(9) alles gemischt — alle Typen abgedeckt, 5 Level
+  var taskLv = G.trainingMode ? (G.level * 2 - 1) : G.level;
+  for (var i = 0; i < 5; i++) G.tasks.push(genOne(taskLv));
 }
 
 // =====================================================================
