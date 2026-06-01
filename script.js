@@ -1369,11 +1369,16 @@ function _genTraining(level) {
   if (level === 5) type = [1, 2, 3, 4][rnd(0, 3)];
 
   if (type === 1) {
-    op = '+'; a = rnd(1, 9); b = rnd(10, 99); ans = a + b;
+    op = '+';
+    var s = rnd(1, 9), l = rnd(10, 99);
+    a = rnd(0, 1) ? s : l;  b = (a === s) ? l : s;
+    ans = s + l;
   } else if (type === 2) {
     op = '-'; a = rnd(15, 50); b = rnd(5, a - 1); ans = a - b;
   } else if (type === 3) {
-    op = '×'; a = rnd(1, 10); b = rnd(1, 10); ans = a * b;
+    op = '×'; a = rnd(1, 10); b = rnd(1, 10);
+    if (rnd(0, 1)) { var t = a; a = b; b = t; }
+    ans = a * b;
   } else {
     op = '÷'; b = rnd(2, 10); ans = rnd(2, 10); a = ans * b;
   }
