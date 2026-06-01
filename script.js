@@ -26,7 +26,9 @@ const G = {
   // ── Neue Feature-Felder ──
   combo: 0,            // aktuelle Treffer-Serie
   correctTotal: 0,     // korrekte Antworten gesamt
-  shield: false,       // Schild-Power-Up aktiv
+  shield: 0,           // Schild-Power-Up: Anzahl verbleibender Schutz-Treffer
+  joker: false,        // Joker aktiv: zeigt einmal die Lösung
+  bonusTimeAll: 0,     // Bonus-Sekunden für ALLE verbleibenden Level
   doublePoints: false, // Doppel-Punkte aktiv (1 Aufgabe)
   extraTime: 0,        // Bonus-Sekunden für nächste Aufgabe
   powerUpUsed: false,  // Power-Up nach Level 5 bereits gezeigt
@@ -1450,7 +1452,7 @@ function startTimer() {
     if (txt)  txt.textContent = '∞';
     return;
   }
-  G.totalTime = Math.max(13, 23 - G.level) + G.extraTime;
+  G.totalTime = Math.max(13, 23 - G.level) + G.extraTime + G.bonusTimeAll;
   G.extraTime = 0;   // einmalig verbraucht
   G.timeLeft = G.totalTime;
   SoundSystem.lastWarningTime = 0;
@@ -1601,6 +1603,29 @@ function showTask() {
   var tsk = $('hud-task');
   if (tsk) tsk.textContent = (G.taskIdx + 1) + '/5';
 
+  // Joker-Button anzeigen wenn aktiv
+  var existingJoker = $('btn-joker');
+  if (existingJoker) existingJoker.remove();
+  if (G.joker) {
+    var jb = document.createElement('button');
+    jb.id = 'btn-joker';
+    jb.className = 'btn btn-secondary btn-sm';
+    jb.style.cssText = 'margin-left:.4rem;background:#f39c12;border-color:#f39c12;';
+    jb.textContent = '💡 Lösung';
+    jb.addEventListener('click', function() {
+      var inp = $('answer-input');
+      if (inp && G.tasks[G.taskIdx]) {
+        inp.value = G.tasks[G.taskIdx].answer;
+        inp.focus();
+      }
+      G.joker = false;
+      jb.remove();
+      updatePowerUpHUD();
+    });
+    var answerRow = document.querySelector('.answer-row');
+    if (answerRow) answerRow.appendChild(jb);
+  }
+
   G._taskStartTime = Date.now();
   startTimer();
 }
@@ -1693,18 +1718,20 @@ function updatePowerUpHUD() {
   var el = $('hud-powerups');
   if (!el) return;
   var badges = [];
-  if (G.shield)       badges.push('<span class="pu-active-badge" title="Schild aktiv">🛡</span>');
-  if (G.doublePoints) badges.push('<span class="pu-active-badge" title="Doppelte Punkte">⭐×2</span>');
-  if (G.extraTime > 0)badges.push('<span class="pu-active-badge" title="+Zeit">⏱+' + G.extraTime + 's</span>');
+  if (G.shield > 0)        badges.push('<span class="pu-active-badge" title="Schild aktiv">🛡×' + G.shield + '</span>');
+  if (G.joker)             badges.push('<span class="pu-active-badge" title="Joker verfügbar">💡</span>');
+  if (G.bonusTimeAll > 0)  badges.push('<span class="pu-active-badge" title="+Zeit alle Level">⏱+' + G.bonusTimeAll + 's</span>');
+  if (G.doublePoints)      badges.push('<span class="pu-active-badge" title="Doppelte Punkte">⭐×2</span>');
+  if (G.extraTime > 0)     badges.push('<span class="pu-active-badge" title="+Zeit">⏱+' + G.extraTime + 's</span>');
   el.innerHTML = badges.join('');
   el.style.display = badges.length ? '' : 'none';
 }
 
 // ── Power-Up Auswahl zeigen ───────────────────────────────────────────────
 var POWERUPS = [
-  { type: 'time',    icon: '⏱', title: '+5 Sekunden',       desc: 'Nächste Aufgabe: 5 Sekunden mehr Zeit' },
-  { type: 'shield',  icon: '🛡', title: 'Schild',            desc: 'Der nächste Fehler wird ignoriert' },
-  { type: 'double',  icon: '⭐', title: 'Doppelte Punkte',   desc: 'Nächste Aufgabe: 2× Punkte' }
+  { type: 'shield2', icon: '🛡🛡', title: 'Doppelschild',      desc: '2 falsche Antworten werden ignoriert' },
+  { type: 'joker',   icon: '💡',   title: 'Joker',             desc: 'Einmal die richtige Lösung anzeigen lassen' },
+  { type: 'timeAll', icon: '⏱',   title: '+5s für alle Level', desc: 'Jedes Level bekommt 5 Sekunden mehr Zeit' }
 ];
 
 function showPowerUp(afterCallback) {
@@ -1734,9 +1761,9 @@ function showPowerUp(afterCallback) {
 }
 
 function applyPowerUp(type) {
-  if (type === 'time')   { G.extraTime = 5; }
-  if (type === 'shield') { G.shield = true; }
-  if (type === 'double') { G.doublePoints = true; }
+  if (type === 'shield2') { G.shield = 2; }
+  if (type === 'joker')   { G.joker = true; }
+  if (type === 'timeAll') { G.bonusTimeAll = 5; }
   updatePowerUpHUD();
 }
 
@@ -2039,8 +2066,8 @@ function correctAns() {
 
 function wrongAns() {
   // Schild-Power-Up: Fehler absorbieren
-  if (G.shield) {
-    G.shield = false;
+  if (G.shield > 0) {
+    G.shield--;
     updatePowerUpHUD();
     var inp2 = $('answer-input');
     if (inp2) { inp2.className = 'wrong'; inp2.value = ''; setTimeout(function(){ inp2.className=''; inp2.focus(); }, 400); }
@@ -2455,7 +2482,7 @@ function startGame() {
   G.level = 1; G.score = 0; G.lives = 3; G.taskIdx = 0;
   G._musicLevel = 0;
   G.combo = 0; G.correctTotal = 0;
-  G.shield = false; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
+  G.shield = 0; G.joker = false; G.bonusTimeAll = 0; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
   G.totalElapsed = 0; G.gameStartTime = Date.now();
   G.stats = { tasks: [] };
 
@@ -2610,6 +2637,10 @@ function initGame() {
     var active = document.querySelector('.screen.active');
     if (active && active.id === 'screen-level-complete') nextLevel();
     if (active && active.id === 'screen-boss-taunt') $('btn-boss-accept').click();
+    if (active && active.id === 'screen-hero-select') {
+      var startBtn = $('btn-start-game');
+      if (startBtn && !startBtn.disabled) startBtn.click();
+    }
   });
 
   // --- Boss taunt screen ---
@@ -2632,7 +2663,7 @@ function initGame() {
     G.level = 1; G.score = 0; G.lives = 3; G.taskIdx = 0;
     G._musicLevel = 0;
     G.combo = 0; G.correctTotal = 0;
-    G.shield = false; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
+    G.shield = 0; G.joker = false; G.bonusTimeAll = 0; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
     G.totalElapsed = 0; G.gameStartTime = Date.now();
     G.stats = { tasks: [] };
     generateTasks(); updateHUD(); updateSprites();
@@ -2651,7 +2682,7 @@ function initGame() {
     G.level = 1; G.score = 0; G.lives = 3; G.taskIdx = 0;
     G._musicLevel = 0;
     G.combo = 0; G.correctTotal = 0;
-    G.shield = false; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
+    G.shield = 0; G.joker = false; G.bonusTimeAll = 0; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
     G.totalElapsed = 0; G.gameStartTime = Date.now();
     G.stats = { tasks: [] };
     generateTasks(); updateHUD(); updateSprites();
@@ -2666,7 +2697,7 @@ function initGame() {
     G.level = 1; G.score = 0; G.lives = 3; G.taskIdx = 0;
     G._musicLevel = 0;
     G.combo = 0; G.correctTotal = 0;
-    G.shield = false; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
+    G.shield = 0; G.joker = false; G.bonusTimeAll = 0; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
     G.totalElapsed = 0; G.gameStartTime = Date.now();
     G.stats = { tasks: [] };
     generateTasks(); updateHUD(); updateSprites();
