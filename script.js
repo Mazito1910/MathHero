@@ -1357,12 +1357,36 @@ function genOne(level) {
   return { text: a + ' ' + op + ' ' + b + ' = ?', answer: ans, op: op };
 }
 
+function _genTraining(level) {
+  // Trainings-Aufgaben: mittelschwer, klar nach Rechentyp getrennt
+  // L1: Addition   — 1-stellig + 2-stellig
+  // L2: Subtraktion — Minuend 15–50, Subtrahend 5 bis Minuend−1
+  // L3: Multiplikation — beide Faktoren 1–10
+  // L4: Division   — Divisor 2–10, ganzzahliges Ergebnis 2–10
+  // L5: Gemischt   — alle vier Typen zufällig
+  var op, a, b, ans;
+  var type = level;
+  if (level === 5) type = [1, 2, 3, 4][rnd(0, 3)];
+
+  if (type === 1) {
+    op = '+'; a = rnd(1, 9); b = rnd(10, 99); ans = a + b;
+  } else if (type === 2) {
+    op = '-'; a = rnd(15, 50); b = rnd(5, a - 1); ans = a - b;
+  } else if (type === 3) {
+    op = '×'; a = rnd(1, 10); b = rnd(1, 10); ans = a * b;
+  } else {
+    op = '÷'; b = rnd(2, 10); ans = rnd(2, 10); a = ans * b;
+  }
+  return { text: a + ' ' + op + ' ' + b + ' = ?', answer: ans, op: op };
+}
+
 function generateTasks() {
   G.tasks = [];
-  // Training: L1→genOne(1) Addition, L2→genOne(3) gemischt +/−, L3→genOne(5) Subtraktion schwer,
-  //           L4→genOne(7) Division, L5→genOne(9) alles gemischt — alle Typen abgedeckt, 5 Level
-  var taskLv = G.trainingMode ? (G.level * 2 - 1) : G.level;
-  for (var i = 0; i < 5; i++) G.tasks.push(genOne(taskLv));
+  if (G.trainingMode) {
+    for (var i = 0; i < 5; i++) G.tasks.push(_genTraining(G.level));
+  } else {
+    for (var i = 0; i < 5; i++) G.tasks.push(genOne(G.level));
+  }
 }
 
 // =====================================================================
