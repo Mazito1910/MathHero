@@ -29,7 +29,10 @@ const G = {
   shield: false,       // Schild-Power-Up aktiv
   doublePoints: false, // Doppel-Punkte aktiv (1 Aufgabe)
   extraTime: 0,        // Bonus-Sekunden für nächste Aufgabe
-  powerUpUsed: false   // Power-Up nach Level 5 bereits gezeigt
+  powerUpUsed: false,  // Power-Up nach Level 5 bereits gezeigt
+  // ── Statistik-Tracking ──
+  stats: { tasks: [] }, // alle Aufgaben-Versuche des laufenden Spiels
+  _taskStartTime: 0     // Zeitpunkt, zu dem die aktuelle Aufgabe gezeigt wurde
 };
 
 // =====================================================================
@@ -1351,7 +1354,7 @@ function genOne(level) {
     else                 { b = rnd(2, 10);  ans = rnd(2, 10); a = ans * b; }
   }
 
-  return { text: a + ' ' + op + ' ' + b + ' = ?', answer: ans };
+  return { text: a + ' ' + op + ' ' + b + ' = ?', answer: ans, op: op };
 }
 
 function generateTasks() {
@@ -1490,6 +1493,30 @@ function stopTimer() {
 }
 
 // =====================================================================
+// N8N WEBHOOK (URL hier eintragen sobald Instanz verfügbar)
+// =====================================================================
+var N8N_WEBHOOK_URL = ''; // z.B. 'https://dein-n8n.example.com/webhook/mathhero-stats'
+
+// =====================================================================
+// STATS TRACKING
+// =====================================================================
+function _recordTask(correct, userAnswer, timedOut) {
+  var task = G.tasks[G.taskIdx];
+  if (!task) return;
+  var timeUsed = (Date.now() - G._taskStartTime) / 1000;
+  G.stats.tasks.push({
+    text:       task.text,
+    op:         task.op,
+    answer:     task.answer,
+    userAnswer: userAnswer,
+    correct:    correct,
+    timedOut:   timedOut,
+    timeUsed:   Math.max(0, timeUsed),
+    level:      G.level
+  });
+}
+
+// =====================================================================
 // GAME LOGIC
 // =====================================================================
 function timeUp() {
@@ -1513,6 +1540,7 @@ function timeUp() {
     }, 220);
   }
 
+  _recordTask(false, null, true);
   G.combo = 0;
   updateComboDisplay();
   G.lives--;
@@ -1544,6 +1572,7 @@ function showTask() {
   var tsk = $('hud-task');
   if (tsk) tsk.textContent = (G.taskIdx + 1) + '/5';
 
+  G._taskStartTime = Date.now();
   startTimer();
 }
 
@@ -1961,6 +1990,7 @@ function correctAns() {
   showFloatingScore(bonus, mult * (G.doublePoints ? 2 : 1));
 
   flash('rgba(46,204,113,0.25)');
+  _recordTask(true, G.tasks[G.taskIdx].answer, false);
   updateHUD();
   updatePowerUpHUD();
 
@@ -1991,6 +2021,8 @@ function wrongAns() {
 
   SoundSystem.playWrong();
   flash('rgba(231,76,60,0.35)');
+  var _wa = $('answer-input');
+  _recordTask(false, _wa ? parseInt(_wa.value) : null, false);
 
   // Combo zurücksetzen
   G.combo = 0;
@@ -2072,33 +2104,136 @@ function showBossTaunt() {
   showScreen('screen-boss-taunt');
 }
 
+// =====================================================================
+// STATS / AUSWERTUNG
+// =====================================================================
+function showStats(opts) {
+  opts = opts || {};
+
+  // Badge
+  var badge = $('stats-result-badge');
+  if (badge) {
+    if (G.trainingMode)      badge.textContent = '📚 Training abgeschlossen!';
+    else if (opts.isGameOver) badge.textContent = '💀 Game Over – Level ' + G.level + ' · ⭐ ' + G.score + ' Punkte';
+    else                      badge.textContent = '🏆 Alle Level geschafft! ⭐ ' + G.score + ' Punkte';
+  }
+
+  var tasks        = G.stats.tasks;
+  var correctTasks = tasks.filter(function(t){ return t.correct; });
+  var wrongTasks   = tasks.filter(function(t){ return !t.correct; });
+  var avgTime      = correctTasks.length
+    ? (correctTasks.reduce(function(s,t){ return s + t.timeUsed; }, 0) / correctTasks.length)
+    : 0;
+  var fastestTask  = correctTasks.length
+    ? correctTasks.reduce(function(a,b){ return a.timeUsed < b.timeUsed ? a : b; })
+    : null;
+
+  // Per-op breakdown (correct answers only)
+  var opStats = {};
+  ['+','-','×','÷'].forEach(function(op) {
+    var sub = correctTasks.filter(function(t){ return t.op === op; });
+    if (sub.length) {
+      opStats[op] = {
+        count: sub.length,
+        avg:   sub.reduce(function(s,t){ return s + t.timeUsed; }, 0) / sub.length,
+        min:   Math.min.apply(null, sub.map(function(t){ return t.timeUsed; }))
+      };
+    }
+  });
+  var opNames = { '+':'Addition', '-':'Subtraktion', '×':'Multiplikation', '÷':'Division' };
+
+  var html = '<div class="stats-summary">';
+  html += '<div class="stats-row"><span>✅ Richtig</span><span><strong>' + correctTasks.length + '</strong> / ' + tasks.length + '</span></div>';
+  html += '<div class="stats-row"><span>⌀ Zeit / richtige Aufgabe</span><span>' + (avgTime ? avgTime.toFixed(1) + 's' : '–') + '</span></div>';
+  if (fastestTask) {
+    var ft = fastestTask.text.replace(' = ?', ' = ') + fastestTask.answer;
+    html += '<div class="stats-row"><span>⚡ Schnellste</span><span>' + ft + ' <em>(' + fastestTask.timeUsed.toFixed(1) + 's)</em></span></div>';
+  }
+  html += '</div>';
+
+  // Per-op table
+  var opKeys = Object.keys(opStats);
+  if (opKeys.length > 0) {
+    html += '<table class="stats-table"><thead><tr><th>Rechentyp</th><th>⌀ Zeit</th><th>Schnellste</th></tr></thead><tbody>';
+    opKeys.forEach(function(op) {
+      var s = opStats[op];
+      html += '<tr><td>' + opNames[op] + '</td><td>' + s.avg.toFixed(1) + 's</td><td>' + s.min.toFixed(1) + 's</td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  // Wrong tasks or perfect
+  if (wrongTasks.length > 0) {
+    html += '<div class="stats-wrong-title">❌ Falsche Aufgaben:</div><ul class="stats-wrong-list">';
+    wrongTasks.forEach(function(t) {
+      var taskStr = t.text.replace(' = ?', ' = ') + t.answer;
+      var ua = t.timedOut ? 'Zeit abgelaufen' : ('du tipptest: ' + t.userAnswer);
+      html += '<li class="stats-wrong-task">' + taskStr + ' <span class="stats-wrong-ua">(' + ua + ')</span></li>';
+    });
+    html += '</ul>';
+  } else if (tasks.length > 0) {
+    html += '<div class="stats-perfect">🌟 Alle Aufgaben korrekt beantwortet!</div>';
+  }
+
+  var content = $('stats-content');
+  if (content) content.innerHTML = html;
+
+  // Email row: nur zeigen wenn Webhook URL gesetzt
+  var emailRow = document.querySelector('.stats-email-row');
+  if (emailRow) emailRow.style.display = N8N_WEBHOOK_URL ? '' : 'none';
+  var emailInput = $('stats-email-input');
+  var sendMsg    = $('stats-send-msg');
+  if (emailInput) emailInput.value = '';
+  if (sendMsg)    sendMsg.textContent = '';
+
+  showScreen('screen-stats');
+}
+
+function sendStatsEmail(email) {
+  if (!N8N_WEBHOOK_URL || !email) return;
+  var sendMsg = $('stats-send-msg');
+  if (sendMsg) sendMsg.textContent = '⏳ Wird gesendet...';
+
+  // Chart-Daten: Aufgabennummer → Zeit (nur richtige)
+  var chartData = G.stats.tasks.map(function(t, i) {
+    return { taskNr: i + 1, task: t.text.replace(' = ?',''), time: t.correct ? t.timeUsed : null, correct: t.correct };
+  });
+
+  var payload = {
+    email:      email,
+    playerName: G.playerName,
+    score:      G.score,
+    level:      G.level,
+    mode:       G.trainingMode ? 'Training' : 'Normal',
+    tasks:      G.stats.tasks,
+    chartData:  chartData,
+    date:       new Date().toLocaleString('de-DE')
+  };
+
+  fetch(N8N_WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(function(r) {
+    if (sendMsg) sendMsg.textContent = r.ok ? '✅ Auswertung wurde gesendet!' : '❌ Fehler beim Senden (Status ' + r.status + ')';
+  }).catch(function() {
+    if (sendMsg) sendMsg.textContent = '❌ Verbindungsfehler – bitte erneut versuchen.';
+  });
+}
+
 function gameOver() {
   stopTimer();
   SoundSystem.playGameOver();
   if (!G.trainingMode) autoSaveScore();
-  showHighscores({ highlightScore: G.score, highlightName: G.playerName,
-                   gameOverLevel: G.level, isGameOver: true });
+  showStats({ isGameOver: true });
 }
 
 function victory() {
   stopTimer();
   SoundSystem.playVictory();
   G.totalElapsed = (Date.now() - G.gameStartTime) / 1000;
-  var vs = $('victory-score'), vt = $('victory-time');
-  var titleEl = document.querySelector('#screen-victory .overlay-title');
-  var subEl   = document.querySelector('#screen-victory .overlay-sub');
-  if (G.trainingMode) {
-    if (titleEl) titleEl.textContent = 'TRAINING ABGESCHLOSSEN!';
-    if (subEl)   subEl.innerHTML = '🎉 Alle Level gemeistert!<br>Super gemacht!';
-    if (vs) vs.textContent = '–';
-  } else {
-    if (titleEl) titleEl.textContent = 'ALLE LEVEL GESCHAFFT!';
-    if (subEl)   subEl.innerHTML = '⭐ <span id="victory-score">' + G.score + '</span> Punkte in <span id="victory-time">' + Math.floor(G.totalElapsed) + 's</span><br>Score automatisch gespeichert!';
-    if (vs) vs.textContent = G.score;
-    autoSaveScore();
-  }
-  if (vt) vt.textContent = Math.floor(G.totalElapsed) + 's';
-  showScreen('screen-victory');
+  if (!G.trainingMode) autoSaveScore();
+  showStats({ isVictory: true });
 }
 
 // =====================================================================
@@ -2293,6 +2428,7 @@ function startGame() {
   G.combo = 0; G.correctTotal = 0;
   G.shield = false; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
   G.totalElapsed = 0; G.gameStartTime = Date.now();
+  G.stats = { tasks: [] };
 
   generateTasks(); updateHUD(); updateSprites();
   updateComboDisplay(); updatePowerUpHUD();
@@ -2469,6 +2605,7 @@ function initGame() {
     G.combo = 0; G.correctTotal = 0;
     G.shield = false; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
     G.totalElapsed = 0; G.gameStartTime = Date.now();
+    G.stats = { tasks: [] };
     generateTasks(); updateHUD(); updateSprites();
     updateComboDisplay(); updatePowerUpHUD();
     showScreen('screen-game');
@@ -2487,10 +2624,42 @@ function initGame() {
     G.combo = 0; G.correctTotal = 0;
     G.shield = false; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
     G.totalElapsed = 0; G.gameStartTime = Date.now();
+    G.stats = { tasks: [] };
     generateTasks(); updateHUD(); updateSprites();
     updateComboDisplay(); updatePowerUpHUD();
     showScreen('screen-game');
     showLevelIntro(G.level, showTask);
+  });
+
+  // --- Stats screen ---
+  $('btn-stats-retry').addEventListener('click', function() {
+    SoundSystem.playClick();
+    G.level = 1; G.score = 0; G.lives = 3; G.taskIdx = 0;
+    G._musicLevel = 0;
+    G.combo = 0; G.correctTotal = 0;
+    G.shield = false; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
+    G.totalElapsed = 0; G.gameStartTime = Date.now();
+    G.stats = { tasks: [] };
+    generateTasks(); updateHUD(); updateSprites();
+    updateComboDisplay(); updatePowerUpHUD();
+    SoundSystem.startLevelMusic(1);
+    showScreen('screen-game');
+    showLevelIntro(G.level, showTask);
+  });
+  $('btn-stats-hs').addEventListener('click', function() {
+    SoundSystem.playClick();
+    showHighscores();
+  });
+  $('btn-stats-menu').addEventListener('click', goToMenu);
+  $('btn-stats-send').addEventListener('click', function() {
+    var emailInput = $('stats-email-input');
+    var email = emailInput ? emailInput.value.trim() : '';
+    if (!email) {
+      var msg = $('stats-send-msg');
+      if (msg) msg.textContent = '⚠️ Bitte eine gültige E-Mail eingeben.';
+      return;
+    }
+    sendStatsEmail(email);
   });
 
   // --- Highscore ---
