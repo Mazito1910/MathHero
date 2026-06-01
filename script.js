@@ -1524,7 +1524,7 @@ function stopTimer() {
 // =====================================================================
 // N8N WEBHOOK (URL hier eintragen sobald Instanz verfügbar)
 // =====================================================================
-var N8N_WEBHOOK_URL = ''; // z.B. 'https://dein-n8n.example.com/webhook/mathhero-stats'
+var N8N_WEBHOOK_URL = 'https://ki-automatisierung.startplatz-ai-hub.de/webhook-test/mathhero-stats';
 
 // =====================================================================
 // STATS TRACKING
