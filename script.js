@@ -2744,6 +2744,11 @@ function initGame() {
   $('btn-next-level').addEventListener('click', nextLevel);
 
   // Enter-Taste bestätigt "WEITER" auf dem Level-Complete-Screen
+  // Versteckter Test-Shortcut: F = Feuerwerk sofort auslösen
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'f' || e.key === 'F') { launchFireworks(); return; }
+  });
+
   document.addEventListener('keydown', function(e) {
     if (e.key !== 'Enter') return;
     var active = document.querySelector('.screen.active');
