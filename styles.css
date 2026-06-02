@@ -129,6 +129,8 @@ body::before {
 .btn-danger:hover { background: #ff6b4a; transform: scale(1.04); }
 .btn-training { background: #00BCD4; color: #fff; }
 .btn-training:hover { background: #26C6DA; transform: scale(1.04) translateY(-2px); box-shadow: 0 8px 0 rgba(0,0,0,.2); }
+.btn-demo { background: #ff6f00; color: #fff; }
+.btn-demo:hover { background: #ff8f00; transform: scale(1.04) translateY(-2px); box-shadow: 0 8px 0 rgba(0,0,0,.2); }
 .btn-sm { padding: .6rem 1.6rem; font-size: 1rem; }
 .training-badge {
   font-size: .82rem; font-weight: 900; letter-spacing: 1px;
