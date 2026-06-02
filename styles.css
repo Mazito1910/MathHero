@@ -1329,3 +1329,36 @@ body::before {
   justify-content: center;
   width: 100%;
 }
+
+/* =========================================================
+   FEUERWERK — Victory Level 10
+   ========================================================= */
+@keyframes rocketLaunch {
+  0%   { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(-340px) scale(.4); opacity: 0; }
+}
+@keyframes particleBurst {
+  0%   { transform: translate(0,0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--px), var(--py)) scale(0); opacity: 0; }
+}
+@keyframes particleFade {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+.fw-rocket {
+  position: fixed;
+  font-size: 1.4rem;
+  pointer-events: none;
+  z-index: 9000;
+  animation: rocketLaunch var(--dur, .9s) var(--delay, 0s) ease-in both;
+}
+.fw-particle {
+  position: fixed;
+  font-size: clamp(.7rem, 1.4vw, 1rem);
+  font-weight: 900;
+  font-family: var(--font-title);
+  pointer-events: none;
+  z-index: 9001;
+  animation: particleBurst var(--pdur, .8s) var(--pdelay, 0s) ease-out both;
+  color: var(--pc, #FFD700);
+}

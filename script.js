@@ -2316,11 +2316,77 @@ function gameOver() {
   showStats({ isGameOver: true });
 }
 
+// =====================================================================
+// FEUERWERK — nach Level 10 Sieg
+// =====================================================================
+function launchFireworks() {
+  var SYMBOLS = ['1','2','3','4','5','6','7','8','9','+','−','×','÷','='];
+  var COLORS  = ['#FFD700','#FF4B2B','#00E5FF','#69F0AE','#E040FB','#FF8F00','#fff'];
+  var W = window.innerWidth, H = window.innerHeight;
+
+  function burst(bx, by) {
+    var count = 22 + rnd(0, 12);
+    for (var i = 0; i < count; i++) {
+      (function(idx) {
+        var el = document.createElement('div');
+        el.className = 'fw-particle';
+        el.textContent = SYMBOLS[rnd(0, SYMBOLS.length - 1)];
+        var angle   = (idx / count) * 360 + rnd(-15, 15);
+        var dist    = 55 + rnd(0, 90);
+        var px      = Math.cos(angle * Math.PI / 180) * dist;
+        var py      = Math.sin(angle * Math.PI / 180) * dist - rnd(10, 40);
+        var dur     = (.55 + Math.random() * .55).toFixed(2);
+        var delay   = (Math.random() * .18).toFixed(2);
+        el.style.cssText =
+          'left:' + bx + 'px;top:' + by + 'px;' +
+          '--px:' + px.toFixed(0) + 'px;--py:' + py.toFixed(0) + 'px;' +
+          '--pdur:' + dur + 's;--pdelay:' + delay + 's;' +
+          '--pc:' + COLORS[rnd(0, COLORS.length - 1)] + ';';
+        document.body.appendChild(el);
+        setTimeout(function() { if (el.parentNode) el.remove(); },
+          (parseFloat(dur) + parseFloat(delay) + .1) * 1000);
+      })(i);
+    }
+  }
+
+  function rocket(startX, delay) {
+    var el = document.createElement('div');
+    el.className = 'fw-rocket';
+    var dur = (.7 + Math.random() * .4).toFixed(2);
+    el.textContent = '🚀';
+    el.style.cssText =
+      'left:' + startX + 'px;top:' + (H * .85) + 'px;' +
+      '--dur:' + dur + 's;--delay:' + delay + 's;';
+    document.body.appendChild(el);
+    // burst wenn Rakete oben ankommt
+    setTimeout(function() {
+      if (el.parentNode) el.remove();
+      burst(startX + 11, H * .85 - 340);
+    }, (parseFloat(dur) + parseFloat(delay)) * 1000);
+  }
+
+  // 6 Wellen Raketen
+  var wave = 0;
+  var positions = [.15,.3,.45,.6,.75,.88];
+  function fireWave() {
+    if (wave >= 6) return;
+    var count = 2 + rnd(0, 2);
+    for (var k = 0; k < count; k++) {
+      var xFrac = positions[(wave * 2 + k) % positions.length];
+      rocket(W * xFrac + rnd(-30, 30), k * .18);
+    }
+    wave++;
+    setTimeout(fireWave, 700 + rnd(0, 300));
+  }
+  fireWave();
+}
+
 function victory() {
   stopTimer();
   SoundSystem.playVictory();
   G.totalElapsed = (Date.now() - G.gameStartTime) / 1000;
-  if (!G.trainingMode) autoSaveScore();
+  if (!G.trainingMode && !G.demoMode) autoSaveScore();
+  if (!G.trainingMode) setTimeout(launchFireworks, 300);
   showStats({ isVictory: true });
 }
 
@@ -2475,7 +2541,6 @@ function renderHeroSelect() {
     var sel = (i === G.selectedHero) ? ' selected' : '';
     html += '<div class="hero-card' + sel + '" data-index="' + i + '">';
     html += '<div class="hero-svg">' + getCharSVG(i) + '</div>';
-    html += '<div class="hero-name">' + c.name + '</div>';
     html += '</div>';
   });
   grid.innerHTML = html;
@@ -2680,11 +2745,18 @@ function initGame() {
   document.addEventListener('keydown', function(e) {
     if (e.key !== 'Enter') return;
     var active = document.querySelector('.screen.active');
-    if (active && active.id === 'screen-level-complete') nextLevel();
-    if (active && active.id === 'screen-boss-taunt') $('btn-boss-accept').click();
-    if (active && active.id === 'screen-hero-select') {
-      var startBtn = $('btn-start-game');
-      if (startBtn && !startBtn.disabled) startBtn.click();
+    if (!active) return;
+    switch (active.id) {
+      case 'screen-hero-select':
+        var startBtn = $('btn-start-game');
+        if (startBtn && !startBtn.disabled) startBtn.click();
+        break;
+      case 'screen-level-complete': nextLevel(); break;
+      case 'screen-boss-taunt':     $('btn-boss-accept').click(); break;
+      case 'screen-timeout':        $('btn-retry-timeout').click(); break;
+      case 'screen-gameover':       $('btn-retry-gameover').click(); break;
+      case 'screen-victory':        $('btn-menu-victory').click(); break;
+      case 'screen-powerup':        break; // Auswahl nötig — kein Enter
     }
   });
 
