@@ -1338,10 +1338,12 @@ body::before {
   100% { transform: translateY(-340px) scale(.4); opacity: 0; }
 }
 @keyframes particleBurst {
-  0%   { transform: translate(0, 0) scale(1);                                                        opacity: 1; }
-  25%  { transform: translate(calc(var(--px) * .6), calc(var(--py) * 1.1)) scale(2);                opacity: 1; }
-  55%  { transform: translate(calc(var(--px) * 1.15), calc(var(--py) * .7)) scale(2);               opacity: 1; }
-  100% { transform: translate(calc(var(--px) * 1.3), calc(var(--py) + var(--fall, 260px))) scale(2); opacity: 0; }
+  0%   { transform: translate(0, 0) scale(.8);                                                          opacity: 0; }
+  8%   { transform: translate(calc(var(--px) * .15), calc(var(--py) * .15)) scale(1.4);                opacity: 1; }
+  30%  { transform: translate(calc(var(--px) * .65), calc(var(--py) * .9)) scale(2);                   opacity: 1; }
+  58%  { transform: translate(calc(var(--px) * 1.05), calc(var(--py) * .55)) scale(2);                 opacity: 1; }
+  78%  { transform: translate(calc(var(--px) * 1.25), calc(var(--py) * .1)) scale(2);                  opacity: .85; }
+  100% { transform: translate(calc(var(--px) * 1.3), calc(var(--py) + var(--fall, 280px))) scale(1.6); opacity: 0; }
 }
 @keyframes particleFade {
   0%   { opacity: 1; }

@@ -2335,9 +2335,9 @@ function launchFireworks() {
         var dist    = 55 + rnd(0, 90);
         var px      = Math.cos(angle * Math.PI / 180) * dist;
         var py      = Math.sin(angle * Math.PI / 180) * dist - rnd(10, 40);
-        var dur     = (1.8 + Math.random() * 1.2).toFixed(2);
-        var delay   = (Math.random() * .55).toFixed(2);
-        var fall    = (180 + rnd(0, 160));
+        var dur     = (2.8 + Math.random() * 1.6).toFixed(2);
+        var delay   = (Math.random() * 1.1).toFixed(2);
+        var fall    = (200 + rnd(0, 200));
         el.style.cssText =
           'left:' + bx + 'px;top:' + by + 'px;' +
           '--px:' + px.toFixed(0) + 'px;--py:' + py.toFixed(0) + 'px;' +
