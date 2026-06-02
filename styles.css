@@ -1338,8 +1338,9 @@ body::before {
   100% { transform: translateY(-340px) scale(.4); opacity: 0; }
 }
 @keyframes particleBurst {
-  0%   { transform: translate(0,0) scale(1); opacity: 1; }
-  100% { transform: translate(var(--px), var(--py)) scale(0); opacity: 0; }
+  0%   { transform: translate(0, 0) scale(1);                              opacity: 1; }
+  30%  { transform: translate(var(--px), var(--py)) scale(2);              opacity: 1; }
+  100% { transform: translate(var(--px), calc(var(--py) + 220px)) scale(2); opacity: 0; }
 }
 @keyframes particleFade {
   0%   { opacity: 1; }
