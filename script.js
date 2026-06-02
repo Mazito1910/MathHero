@@ -2335,11 +2335,13 @@ function launchFireworks() {
         var dist    = 55 + rnd(0, 90);
         var px      = Math.cos(angle * Math.PI / 180) * dist;
         var py      = Math.sin(angle * Math.PI / 180) * dist - rnd(10, 40);
-        var dur     = (1.2 + Math.random() * .8).toFixed(2);
-        var delay   = (Math.random() * .18).toFixed(2);
+        var dur     = (1.8 + Math.random() * 1.2).toFixed(2);
+        var delay   = (Math.random() * .55).toFixed(2);
+        var fall    = (180 + rnd(0, 160));
         el.style.cssText =
           'left:' + bx + 'px;top:' + by + 'px;' +
           '--px:' + px.toFixed(0) + 'px;--py:' + py.toFixed(0) + 'px;' +
+          '--fall:' + fall + 'px;' +
           '--pdur:' + dur + 's;--pdelay:' + delay + 's;' +
           '--pc:' + COLORS[rnd(0, COLORS.length - 1)] + ';';
         document.body.appendChild(el);
