@@ -20,8 +20,6 @@ const G = {
   selectedHero: null,
   playerName: '',
   trainingMode: false,
-  demoMode: false,     // Präsentations-Demo: nur Level 1, 6, 10
-  demoIdx: 0,          // Index in DEMO_LEVELS
   enemyHP: 5,
   enemyMaxHP: 5,
   _musicLevel: 0,
@@ -1407,11 +1405,7 @@ function updateHUD() {
   if (scr) scr.textContent = G.trainingMode ? '–' : G.score;
   if (tsk) tsk.textContent = Math.min(G.taskIdx + 1, 5) + '/5';
   var maxLvEl = $('hud-max-level');
-  if (maxLvEl) maxLvEl.textContent = G.trainingMode ? '/5' : G.demoMode ? '/3' : '/10';
-  if (G.demoMode) {
-    var lvEl = $('hud-level');
-    if (lvEl) lvEl.textContent = G.demoIdx + 1;
-  }
+  if (maxLvEl) maxLvEl.textContent = G.trainingMode ? '/5' : '/10';
 
   var heartsDiv = $('hud-hearts');
   if (heartsDiv) {
@@ -2099,8 +2093,7 @@ function wrongAns() {
     setTimeout(function() { ps.classList.remove('player-shake'); }, 520);
   }
 
-  if (!G.trainingMode && !G.demoMode) G.lives--;
-  if (G.demoMode) G.lives--;
+  if (!G.trainingMode) G.lives--;
 
   var inp = $('answer-input');
   if (inp) {
@@ -2111,9 +2104,6 @@ function wrongAns() {
   updateHUD();
 
   if (!G.trainingMode && G.lives <= 0) {
-    setTimeout(function() { stopTimer(); gameOver(); }, 400);
-  }
-  if (G.demoMode && G.lives <= 0) {
     setTimeout(function() { stopTimer(); gameOver(); }, 400);
   }
 }
@@ -2136,13 +2126,9 @@ function levelWin() {
   showScreen('screen-level-complete');
 }
 
-var DEMO_LEVELS = [1, 6, 10];
-
 function nextLevel() {
-  // Power-Up: nach Level 5 (Normal) oder nach Level 6 (Demo, demoIdx 1)
-  var isPowerUpMoment = !G.trainingMode && !G.powerUpUsed
-    && ((G.demoMode && G.demoIdx === 1) || (!G.demoMode && G.level === 5));
-  if (isPowerUpMoment) {
+  // Power-Up nach Level 5 (nur Normal-Modus)
+  if (!G.trainingMode && !G.powerUpUsed && G.level === 5) {
     G.powerUpUsed = true;
     showPowerUp(function() { _doNextLevel(); });
     return;
@@ -2152,24 +2138,6 @@ function nextLevel() {
 
 function _doNextLevel() {
   G.taskIdx = 0;
-
-  if (G.demoMode) {
-    G.demoIdx++;
-    if (G.demoIdx >= DEMO_LEVELS.length) {
-      victory();
-    } else {
-      G.level = DEMO_LEVELS[G.demoIdx];
-      if (G.level === 10) {
-        showBossTaunt();
-      } else {
-        generateTasks(); updateHUD(); updateSprites();
-        showScreen('screen-game');
-        showLevelIntro(G.level, showTask);
-      }
-    }
-    return;
-  }
-
   G.level++;
   var maxLv = G.trainingMode ? 5 : 10;
   if (G.level > maxLv) {
@@ -2387,7 +2355,7 @@ function victory() {
   stopTimer();
   SoundSystem.playVictory();
   G.totalElapsed = (Date.now() - G.gameStartTime) / 1000;
-  if (!G.trainingMode && !G.demoMode) autoSaveScore();
+  if (!G.trainingMode) autoSaveScore();
   if (!G.trainingMode) setTimeout(launchFireworks, 300);
   showStats({ isVictory: true });
 }
@@ -2578,13 +2546,13 @@ function startGame() {
   SoundSystem.stopMenuMusic();
   SoundSystem.playClick();
 
-  G.level = G.demoMode ? DEMO_LEVELS[0] : 1;
+  G.level = 1;
   G.score = 0; G.lives = 3; G.taskIdx = 0;
   G._musicLevel = 0;
   G.combo = 0; G.correctTotal = 0;
   G.shield = 0; G.joker = false; G.bonusTimeAll = 0; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
   G.totalElapsed = 0; G.gameStartTime = Date.now();
-  G.stats = { tasks: [] }; G.demoIdx = 0;
+  G.stats = { tasks: [] };
 
   generateTasks(); updateHUD(); updateSprites();
   updateComboDisplay(); updatePowerUpHUD();
@@ -2603,7 +2571,7 @@ function goToMenu() {
   SoundSystem.stopMusic();
   SoundSystem.playClick();
   G.selectedHero = null; G.playerName = '';
-  G.trainingMode = false; G.demoMode = false;
+  G.trainingMode = false;
   G._musicLevel = 0;
   tryEnableStart();
   showScreen('screen-menu');
@@ -2700,18 +2668,6 @@ function initGame() {
     showScreen('screen-hero-select');
   });
 
-  $('btn-demo').addEventListener('click', function() {
-    SoundSystem.playClick();
-    G.trainingMode = false; G.demoMode = false;
-    G.demoMode = true;
-    var startBtn = $('btn-start-game');
-    if (startBtn) startBtn.innerHTML = '🎤 DEMO ▶';
-    renderHeroSelect();
-    var ni = $('hero-name-input');
-    if (ni) ni.value = G.playerName || '';
-    showScreen('screen-hero-select');
-  });
-
   $('btn-highscore').addEventListener('click', function() {
     SoundSystem.playClick();
     showHighscores();
@@ -2790,7 +2746,7 @@ function initGame() {
     G.combo = 0; G.correctTotal = 0;
     G.shield = 0; G.joker = false; G.bonusTimeAll = 0; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
     G.totalElapsed = 0; G.gameStartTime = Date.now();
-    G.stats = { tasks: [] }; G.demoIdx = 0;
+    G.stats = { tasks: [] };
     generateTasks(); updateHUD(); updateSprites();
     updateComboDisplay(); updatePowerUpHUD();
     showScreen('screen-game');
@@ -2809,7 +2765,7 @@ function initGame() {
     G.combo = 0; G.correctTotal = 0;
     G.shield = 0; G.joker = false; G.bonusTimeAll = 0; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
     G.totalElapsed = 0; G.gameStartTime = Date.now();
-    G.stats = { tasks: [] }; G.demoIdx = 0;
+    G.stats = { tasks: [] };
     generateTasks(); updateHUD(); updateSprites();
     updateComboDisplay(); updatePowerUpHUD();
     showScreen('screen-game');
@@ -2824,7 +2780,7 @@ function initGame() {
     G.combo = 0; G.correctTotal = 0;
     G.shield = 0; G.joker = false; G.bonusTimeAll = 0; G.doublePoints = false; G.extraTime = 0; G.powerUpUsed = false;
     G.totalElapsed = 0; G.gameStartTime = Date.now();
-    G.stats = { tasks: [] }; G.demoIdx = 0;
+    G.stats = { tasks: [] };
     generateTasks(); updateHUD(); updateSprites();
     updateComboDisplay(); updatePowerUpHUD();
     SoundSystem.startLevelMusic(1);
