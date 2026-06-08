@@ -2400,7 +2400,9 @@ function showHighscores(opts) {
   _applyHsFilterButtons();
   _renderHsHeader();
   showScreen('screen-highscore');
-  _loadAndRenderScores();
+  // Kurze Verzögerung damit Supabase den soeben gespeicherten Score verarbeiten kann
+  var delay = (_hsOpts.freshScore) ? 1500 : 0;
+  setTimeout(_loadAndRenderScores, delay);
 }
 
 // Header / Banner je nach Kontext (Game Over vs. normaler Aufruf)
@@ -2789,7 +2791,7 @@ function initGame() {
   });
   $('btn-stats-hs').addEventListener('click', function() {
     SoundSystem.playClick();
-    showHighscores();
+    showHighscores({ freshScore: !G.trainingMode });
   });
   $('btn-stats-menu').addEventListener('click', goToMenu);
   $('btn-stats-send').addEventListener('click', function() {
